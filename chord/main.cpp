@@ -19,7 +19,14 @@ int main()
         string instruction;
         std::getline(cin, instruction);
 
-        
+        /**
+         * Quit: broadcast to set the predecessor's successor
+         *  and the successor's predecessor
+        */
+        if (instruction == "quit")
+        {
+            return 0;
+        }
     }
 
     return 0;
