@@ -2,6 +2,8 @@
 #define __CHORD_SERVER_HPP__
 
 #include "node.hpp"
+#include "message.hpp"
+#include "instruction.hpp"
 #include "fingertable.hpp"
 
 #include <icarus/tcpserver.hpp>
@@ -18,20 +20,55 @@ class Server
         // ...
     }
 
+    /**
+     * Quit: broadcast to set the predecessor's successor
+     *  and the successor's predecessor
+    */
+    ~Server()
+    {
+        // ...
+    }
+
     void start()
     {
         tcp_server_.start();
     }
 
-    /**
-     * Quit:
-    */
-    void on_connection(const icarus::TcpConnectionPtr &conn)
+    void handle_instruction(const Instruction &ins)
     {
-        if (!conn->connected())
+        switch (ins.type())
         {
+        case Instruction::Join:
+          handle_instruction_join(ins.value());
+          break;
 
+        case Instruction::Get:
+          handle_instruction_get(ins.value());
+          break;
+
+        case Instruction::Put:
+          handle_instruction_put(ins.value());
+          break;
+
+        default:
+          break;
         }
+    }
+
+  private:
+    void handle_instruction_join(const std::string &value)
+    {
+
+    }
+
+    void handle_instruction_get(const std::string &value)
+    {
+
+    }
+
+    void handle_instruction_put(const std::string &value)
+    {
+
     }
 
     /**

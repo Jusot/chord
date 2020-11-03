@@ -50,7 +50,7 @@ class Instruction
     }
 
     Type type() const { return type_; }
-    const std::string &value() { return value_; }
+    const std::string &value() const { return value_; }
 
   private:
     Instruction(Type type, std::string value)

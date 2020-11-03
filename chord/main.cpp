@@ -1,4 +1,5 @@
 #include "server.hpp"
+#include "instruction.hpp"
 
 #include <iostream>
 #include <icarus/eventloopthread.hpp>
@@ -16,16 +17,31 @@ int main()
 
     while (true)
     {
-        string instruction;
-        std::getline(cin, instruction);
+        string instruction_str;
+        std::getline(cin, instruction_str);
 
-        /**
-         * Quit: broadcast to set the predecessor's successor
-         *  and the successor's predecessor
-        */
-        if (instruction == "quit")
+        auto res = Instruction::parse(instruction_str);
+        if (!res.has_value())
         {
-            return 0;
+            cout << "<ERROR-INPUT>" << endl;
+        }
+        else
+        {
+            auto instruction = res.value();
+            if (instruction.type() == Instruction::Quit)
+            {
+                /**
+                 * Quit: broadcast to set the predecessor's successor
+                 *  and the successor's predecessor
+                 *
+                 * This will be handled in the destructor of server
+                */
+                return 0;
+            }
+            else
+            {
+                server.handle_instruction(instruction);
+            }
         }
     }
 
