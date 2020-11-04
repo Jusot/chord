@@ -31,10 +31,10 @@ int main()
             if (instruction.type() == Instruction::Quit)
             {
                 /**
-                 * Quit: broadcast to set the predecessor's successor
+                 * quit: broadcast to set the predecessor's successor
                  *  and the successor's predecessor
                  *
-                 * This will be handled in the destructor of server
+                 * this will be handled in the destructor of server
                 */
                 return 0;
             }
