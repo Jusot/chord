@@ -85,14 +85,17 @@ class Server
             */
             if (conn->connected())
             {
-                conn->send(Message(Message::Join, "join", {std::to_string(this->listen_addr_.to_port())}).to_str());
+                conn->send(Message(Message::Join, "join", {std::to_string(this->listen_addr_.to_port())}).to_str() + "\r\n");
             }
         });
         client.set_message_callback([] (const icarus::TcpConnectionPtr &conn, icarus::Buffer *buf)
         {
-            /**
-             *
-            */
+            auto crlf = buf->findCRLF();
+            if (crlf != nullptr)
+            {
+                auto message = Message::parse(buf->retrieve_as_string(crlf - buf->peek()));
+                buf->retrieve_until(crlf + 2);
+            }
         });
 
         /**
