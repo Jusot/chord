@@ -15,13 +15,14 @@ class Server
 {
   public:
     Server(icarus::EventLoop *loop, const icarus::InetAddress &listen_addr)
-      : tcp_server_(loop, listen_addr, "chord server")
+      : listen_addr_(listen_addr)
+      , tcp_server_(loop, listen_addr, "chord server")
     {
         // ...
     }
 
     /**
-     * Quit: broadcast to set the predecessor's successor
+     * quit: broadcast to set the predecessor's successor
      *  and the successor's predecessor
     */
     ~Server()
@@ -58,7 +59,16 @@ class Server
   private:
     void handle_instruction_join(const std::string &value)
     {
+        auto pos = value.find(':');
+        auto dst_ip = value.substr(0, pos);
+        auto dst_port = static_cast<std::uint16_t>(std::stoi(value.substr(pos + 1)));
+        auto src_port = listen_addr_.to_port();
 
+        auto server_addr = icarus::InetAddress(dst_ip.c_str(), dst_port);
+
+        /**
+         * then bind this server with one client
+        */
     }
 
     void handle_instruction_get(const std::string &value)
@@ -72,7 +82,7 @@ class Server
     }
 
     /**
-     * Join: insert it directly if received node is between the current node and the successor
+     * join: insert it directly if received node is between the current node and the successor
     */
     void on_message(const icarus::TcpConnectionPtr &conn, Buffer *buf)
     {
@@ -83,6 +93,7 @@ class Server
     Node predecessor_;
     Node successor_;
     FingerTable table_;
+    InetAddress listen_addr_;
     icarus::TcpServer tcp_server_;
 };
 } // namespace chord
