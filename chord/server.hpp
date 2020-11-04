@@ -77,11 +77,22 @@ class Server
         /**
          * set callbacks
         */
-        client.set_connection_callback([] (const icarus::TcpConnectionPtr &conn) {
-
+        client.set_connection_callback([this] (const icarus::TcpConnectionPtr &conn)
+        {
+            /**
+             * when connection is connected,
+             *  we will send a message `join,src_port`
+            */
+            if (conn->connected())
+            {
+                conn->send(Message(Message::Join, "join", {std::to_string(this->listen_addr_.to_port())}).to_str());
+            }
         });
-        client.set_message_callback([] (const icarus::TcpConnectionPtr &conn, icarus::Buffer *buf) {
-
+        client.set_message_callback([] (const icarus::TcpConnectionPtr &conn, icarus::Buffer *buf)
+        {
+            /**
+             *
+            */
         });
 
         /**
