@@ -1,6 +1,8 @@
 #ifndef __CHORD_CLIENT_HPP__
 #define __CHORD_CLIENT_HPP__
 
+#include <icarus/inetaddress.hpp>
+
 namespace chord
 {
 class Client
@@ -8,6 +10,7 @@ class Client
   public:
 
   private:
+    icarus::InetAddress server_addr_;
 };
 } // namespace chord
 
