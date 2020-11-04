@@ -85,7 +85,12 @@ class Server
             */
             if (conn->connected())
             {
-                conn->send(Message(Message::Join, "join", {std::to_string(this->listen_addr_.to_port())}).to_str() + "\r\n");
+                conn->send(
+                    Message(
+                        Message::Join, "join",
+                        {std::to_string(this->listen_addr_.to_port())}
+                    ).to_str() + "\r\n"
+                );
             }
         });
         client.set_message_callback([] (const icarus::TcpConnectionPtr &conn, icarus::Buffer *buf)
