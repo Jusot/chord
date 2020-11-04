@@ -15,7 +15,7 @@ class Message
   public:
     enum Type
     {
-        Join, // join dst_ip:port src_ip:port
+        Join, // join,src_port
 
         Get,
         Put,
