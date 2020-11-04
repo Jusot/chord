@@ -28,6 +28,9 @@ class Instruction
         if (type_str == "join")
         {
             type = Join;
+            /**
+             * TODO: catch join-ins with wrong value
+            */
         }
         else if (type_str == "get")
         {
