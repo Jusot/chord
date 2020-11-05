@@ -93,7 +93,7 @@ class Server
             {
                 conn->send(
                     Message(
-                        Message::Join, "join",
+                        Message::Join,
                         {std::to_string(this->listen_addr_.to_port())}
                     ).to_str() + "\r\n"
                 );
@@ -101,15 +101,17 @@ class Server
         });
         client.set_message_callback([&finish] (const icarus::TcpConnectionPtr &conn, icarus::Buffer *buf)
         {
-            auto message = Message::parse(buf);
-            if (message.has_value())
+            auto res = Message::parse(buf);
+            if (!res.has_value())
             {
-                /**
-                 * TODO: resolve message
-                */
-                conn->shutdown();
-                finish = true;
+                return;
             }
+
+            /**
+             * TODO: resolve message
+            */
+            conn->shutdown();
+            finish = true;
         });
         client.enable_retry();
 
@@ -160,7 +162,51 @@ class Server
     */
     void on_message(const icarus::TcpConnectionPtr &conn, Buffer *buf)
     {
+        auto res = Message::parse(buf);
+        if (!res.has_value())
+        {
+            return;
+        }
 
+        auto &message = res.value();
+        switch (message.type())
+        {
+        case Message::Join:
+            break;
+        case Message::Get:
+            break;
+        case Message::Put:
+            break;
+        case Message::SetPre:
+            break;
+        case Message::SetSuc:
+            break;
+        }
+    }
+
+    void on_message_join(const icarus::TcpConnectionPtr &conn, const Message &message)
+    {
+        // ...
+    }
+
+    void on_message_get(const icarus::TcpConnectionPtr &conn, const Message &message)
+    {
+        // ...
+    }
+
+    void on_message_put(const icarus::TcpConnectionPtr &conn, const Message &message)
+    {
+        // ...
+    }
+
+    void on_message_set_pre(const icarus::TcpConnectionPtr &conn, const Message &message)
+    {
+        // ...
+    }
+
+    void on_message_set_suc(const icarus::TcpConnectionPtr &conn, const Message &message)
+    {
+        // ...
     }
 
   private:
