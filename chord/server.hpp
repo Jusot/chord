@@ -21,8 +21,8 @@ class Server
 {
   public:
     Server(icarus::EventLoop *loop, const icarus::InetAddress &listen_addr)
-      : established_(false)
-      , self_hash_(std::hash<std::string>{}(listen_addr.to_ip_port()))
+      : table_(std::hash<std::string>{}(listen_addr.to_ip_port()))
+      , established_(false)
       , listen_addr_(listen_addr)
       , tcp_server_(loop, listen_addr, "chord server")
     {
@@ -165,7 +165,6 @@ class Server
     FingerTable table_;
 
     bool established_;
-    std::size_t self_hash_;
     InetAddress listen_addr_;
     icarus::TcpServer tcp_server_;
 };

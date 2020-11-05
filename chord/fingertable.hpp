@@ -14,9 +14,14 @@ class FingerTable
     static constexpr std::size_t M = sizeof(std::size_t) * 8;
 
   public:
-    FingerTable() = default;
+    FingerTable(std::size_t base)
+      : base_(base)
+    {
+        // ...
+    }
 
   private:
+    std::size_t base_;
     std::array<Node, M> nodes_;
 };
 } // namespace chord
