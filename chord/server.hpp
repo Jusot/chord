@@ -21,7 +21,9 @@ class Server
 {
   public:
     Server(icarus::EventLoop *loop, const icarus::InetAddress &listen_addr)
-      : listen_addr_(listen_addr)
+      : established_(false)
+      , self_hash_(std::hash<std::string>{}(listen_addr.to_ip_port()))
+      , listen_addr_(listen_addr)
       , tcp_server_(loop, listen_addr, "chord server")
     {
         // ...
@@ -81,7 +83,7 @@ class Server
         /**
          * set callbacks
         */
-        client.set_connection_callback([this, &loop] (const icarus::TcpConnectionPtr &conn)
+        client.set_connection_callback([this] (const icarus::TcpConnectionPtr &conn)
         {
             /**
              * when connection is connected,
@@ -130,6 +132,8 @@ class Server
         if (finish)
         {
             std::cout << "[ESTABILISHED SUCCESSFULLY]" << std::endl;
+
+            established_ = true;
         }
         else
         {
@@ -159,6 +163,9 @@ class Server
     Node predecessor_;
     Node successor_;
     FingerTable table_;
+
+    bool established_;
+    std::size_t self_hash_;
     InetAddress listen_addr_;
     icarus::TcpServer tcp_server_;
 };
