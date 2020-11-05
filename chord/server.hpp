@@ -6,6 +6,9 @@
 #include "instruction.hpp"
 #include "fingertable.hpp"
 
+#include <thread>
+#include <chrono>
+#include <iostream>
 #include <icarus/buffer.hpp>
 #include <icarus/eventloop.hpp>
 #include <icarus/tcpclient.hpp>
@@ -70,6 +73,7 @@ class Server
         /**
          * wait here until things are ok or wrong
         */
+        bool finish = false;
         icarus::EventLoop loop;
         icarus::InetAddress server_addr(dst_ip.c_str(), dst_port);
         icarus::TcpClient client(&loop, server_addr, "chord client");
@@ -77,7 +81,7 @@ class Server
         /**
          * set callbacks
         */
-        client.set_connection_callback([this] (const icarus::TcpConnectionPtr &conn)
+        client.set_connection_callback([this, &loop] (const icarus::TcpConnectionPtr &conn)
         {
             /**
              * when connection is connected,
@@ -93,21 +97,44 @@ class Server
                 );
             }
         });
-        client.set_message_callback([] (const icarus::TcpConnectionPtr &conn, icarus::Buffer *buf)
+        client.set_message_callback([&finish] (const icarus::TcpConnectionPtr &conn, icarus::Buffer *buf)
         {
             auto crlf = buf->findCRLF();
             if (crlf != nullptr)
             {
                 auto message = Message::parse(buf->retrieve_as_string(crlf - buf->peek()));
                 buf->retrieve_until(crlf + 2);
+
+                conn->shutdown();
+                finish = true;
             }
         });
+        client.enable_retry();
+
+        std::cout << "CONNECTING..." << std::endl;
+        std::thread timer([&loop] {
+            std::this_thread::sleep_for(std::chrono::seconds(3));
+            loop.quit();
+        });
+        timer.detach();
 
         /**
          * loop until the process is finished
         */
         client.connect();
         loop.loop();
+
+        /**
+         * after loop quits
+        */
+        if (finish)
+        {
+            std::cout << "[ESTABILISHED SUCCESSFULLY]" << std::endl;
+        }
+        else
+        {
+            std::cout << "[FAILED CONNECTION]" << std::endl;
+        }
     }
 
     void handle_instruction_get(const std::string &value)
