@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <optional>
+#include <icarus/buffer.hpp>
 
 namespace chord
 {
@@ -68,6 +69,20 @@ class Message
         }
 
         return Message(type, std::move(method), std::move(params));
+    }
+
+    static std::optional<Message> parse(Buffer *buf)
+    {
+        auto crlf = buf->findCRLF();
+        if (crlf == nullptr)
+        {
+            return {};
+        }
+
+        auto message = parse(buf->retrieve_as_string(crlf - buf->peek()));
+        buf->retrieve_until(crlf + 2);
+
+        return message;
     }
 
     Message(Type type, std::string method, std::vector<std::string> params)

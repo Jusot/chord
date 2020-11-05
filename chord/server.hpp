@@ -101,12 +101,12 @@ class Server
         });
         client.set_message_callback([&finish] (const icarus::TcpConnectionPtr &conn, icarus::Buffer *buf)
         {
-            auto crlf = buf->findCRLF();
-            if (crlf != nullptr)
+            auto message = Message::parse(buf);
+            if (message.has_value())
             {
-                auto message = Message::parse(buf->retrieve_as_string(crlf - buf->peek()));
-                buf->retrieve_until(crlf + 2);
-
+                /**
+                 * TODO: resolve message
+                */
                 conn->shutdown();
                 finish = true;
             }
@@ -114,7 +114,11 @@ class Server
         client.enable_retry();
 
         std::cout << "CONNECTING..." << std::endl;
-        std::thread timer([&loop] {
+        std::thread timer([&loop]
+        {
+            /**
+             * TODO: unsafe, may involve more states
+            */
             std::this_thread::sleep_for(std::chrono::seconds(3));
             loop.quit();
         });
