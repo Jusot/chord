@@ -20,6 +20,9 @@ class FingerTable
         // ...
     }
 
+    void // NOTE: the return type is not clear now
+    insert(icarus::InetAddress addr);
+
   private:
     std::size_t base_;
     std::array<Node, M> nodes_;

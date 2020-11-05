@@ -14,6 +14,9 @@ namespace chord
 class Message
 {
   public:
+    /**
+     * these annotations only for sending
+    */
     enum Type
     {
         Join, // join,src_port

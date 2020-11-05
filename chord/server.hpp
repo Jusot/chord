@@ -13,6 +13,7 @@
 #include <icarus/eventloop.hpp>
 #include <icarus/tcpclient.hpp>
 #include <icarus/tcpserver.hpp>
+#include <icarus/inetaddress.hpp>
 #include <icarus/tcpconnection.hpp>
 
 namespace chord
@@ -91,8 +92,8 @@ class Server
             */
             if (conn->connected())
             {
-                auto message = Message(Message::Join, { std::to_string(this->listen_addr_.to_port()) }).to_str() + "\r\n";
-                conn->send(message);
+                auto send_str = Message(Message::Join, { std::to_string(this->listen_addr_.to_port()) }).to_str() + "\r\n";
+                conn->send(send_str);
             }
         });
         client.set_message_callback([&finish] (const icarus::TcpConnectionPtr &conn, icarus::Buffer *buf)
@@ -185,27 +186,37 @@ class Server
         }
     }
 
-    void on_message_join(const icarus::TcpConnectionPtr &conn, const Message &message)
+    void on_message_join(const icarus::TcpConnectionPtr &conn, const Message &msg)
+    {
+        auto src_ip = conn->peer_address().to_ip();
+        auto src_port = static_cast<std::uint16_t>(std::stoi(msg[0]));
+        auto peer_addr = icarus::InetAddress(src_ip.c_str(), src_port);
+
+        /**
+         * TODO:
+        */
+        table_.insert(peer_addr);
+
+        auto send_str = Message(Message::Join, {"success"}).to_str() + "\r\n";
+        conn->send(send_str);
+    }
+
+    void on_message_get(const icarus::TcpConnectionPtr &conn, const Message &msg)
     {
         // ...
     }
 
-    void on_message_get(const icarus::TcpConnectionPtr &conn, const Message &message)
+    void on_message_put(const icarus::TcpConnectionPtr &conn, const Message &msg)
     {
         // ...
     }
 
-    void on_message_put(const icarus::TcpConnectionPtr &conn, const Message &message)
+    void on_message_set_pre(const icarus::TcpConnectionPtr &conn, const Message &msg)
     {
         // ...
     }
 
-    void on_message_set_pre(const icarus::TcpConnectionPtr &conn, const Message &message)
-    {
-        // ...
-    }
-
-    void on_message_set_suc(const icarus::TcpConnectionPtr &conn, const Message &message)
+    void on_message_set_suc(const icarus::TcpConnectionPtr &conn, const Message &msg)
     {
         // ...
     }
