@@ -21,11 +21,8 @@ class Message
         Get,
         Put,
 
-        /**
-         * these two only used between nodes
-        */
-        SetPredecessor,
-        SetSuccessor,
+        SetPre,
+        SetSuc,
     };
 
     static std::optional<Message> parse(const std::string &message)
@@ -48,13 +45,13 @@ class Message
         {
             type = Put;
         }
-        else if (method == "set-p")
+        else if (method == "setpre")
         {
-            type = SetPredecessor;
+            type = SetPre;
         }
-        else if (method == "set-s")
+        else if (method == "setsuc")
         {
-            type = SetSuccessor;
+            type = SetSuc;
         }
         else
         {
@@ -85,8 +82,33 @@ class Message
         return message;
     }
 
+    Message(Type type, std::vector<std::string> params)
+      : type_(type), params_(std::move(params))
+    {
+        switch (type)
+        {
+        case Join:
+            method_ = "join";
+            break;
+        case Get:
+            method_ = "get";
+            break;
+        case Put:
+            method_ = "put";
+            break;
+        case SetPre:
+            method_ = "setpre";
+            break;
+        case SetSuc:
+            method_ = "setsuc";
+            break;
+        }
+    }
+
     Message(Type type, std::string method, std::vector<std::string> params)
-      : type_(type), method_(std::move(method)), params_(std::move(params))
+      : type_(type)
+      , method_(std::move(method))
+      , params_(std::move(params))
     {
         // ...
     }
