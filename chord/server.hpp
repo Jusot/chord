@@ -91,12 +91,8 @@ class Server
             */
             if (conn->connected())
             {
-                conn->send(
-                    Message(
-                        Message::Join,
-                        {std::to_string(this->listen_addr_.to_port())}
-                    ).to_str() + "\r\n"
-                );
+                auto message = Message(Message::Join, { std::to_string(this->listen_addr_.to_port()) }).to_str() + "\r\n";
+                conn->send(message);
             }
         });
         client.set_message_callback([&finish] (const icarus::TcpConnectionPtr &conn, icarus::Buffer *buf)
@@ -172,14 +168,19 @@ class Server
         switch (message.type())
         {
         case Message::Join:
+            on_message_join(conn, message);
             break;
         case Message::Get:
+            on_message_get(conn, message);
             break;
         case Message::Put:
+            on_message_put(conn, message);
             break;
         case Message::SetPre:
+            on_message_set_pre(conn, message);
             break;
         case Message::SetSuc:
+            on_message_set_suc(conn, message);
             break;
         }
     }
