@@ -20,8 +20,18 @@ class FingerTable
         // ...
     }
 
-    void // NOTE: the return type is not clear now
-    insert(icarus::InetAddress addr);
+    std::vector<Node>
+    insert(const icarus::InetAddress &addr);
+
+    std::vector<Node>
+    insert(const Node &node);
+
+    bool find(const Node &node);
+
+    std::size_t base() const
+    {
+        return base_;
+    }
 
   private:
     std::size_t base_;
