@@ -23,9 +23,36 @@ class Node
         // ...
     }
 
+    Node(std::size_t hash_value,
+        const icarus::InetAddress &addr)
+      : has_value_(true)
+      , hash_value_(hash_value)
+      , addr_(addr)
+    {
+        // ...
+    }
+
+    Node(const Node &other)
+      : has_value_(other.has_value_)
+      , hash_value_(other.hash_value_)
+      , addr_(other.addr_)
+    {
+        // ...
+    }
+
     bool has_value() const
     {
         return has_value_;
+    }
+
+    std::size_t hash_value() const
+    {
+        return hash_value_;
+    }
+
+    const icarus::InetAddress &addr() const
+    {
+        return addr_;
     }
 
   private:
