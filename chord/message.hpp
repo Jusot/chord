@@ -17,50 +17,26 @@ class Message
     /**
      * these annotations only for sending
     */
-    enum Type
+    enum Type : char
     {
-        Join, // join,src_port
+        Join, // 0,src_port
+        Insert, // 1,src_ip,src_port
+        Delete, // 2,src_port
 
         Get,
         Put,
-
-        SetPre,
-        SetSuc,
     };
 
     static std::optional<Message> parse(const std::string &message)
     {
-        std::size_t pos = message.find(',');
-
-        Type type;
-        auto method = message.substr(0, pos);
-        std::vector<std::string> params;
-
-        if (method == "join")
-        {
-            type = Join;
-        }
-        else if (method == "get")
-        {
-            type = Get;
-        }
-        else if (method == "put")
-        {
-            type = Put;
-        }
-        else if (method == "setpre")
-        {
-            type = SetPre;
-        }
-        else if (method == "setsuc")
-        {
-            type = SetSuc;
-        }
-        else
+        Type type = Type(message[0]);
+        if (type > Type::Put)
         {
             return {};
         }
 
+        std::vector<std::string> params;
+        std::size_t pos = 1;
         while (pos != message.npos)
         {
             auto next_pos = message.find(',', pos + 1);
@@ -68,7 +44,7 @@ class Message
             pos = next_pos;
         }
 
-        return Message(type, std::move(method), std::move(params));
+        return Message(type, std::move(params));
     }
 
     static std::optional<Message> parse(Buffer *buf)
@@ -88,37 +64,12 @@ class Message
     Message(Type type, std::vector<std::string> params)
       : type_(type), params_(std::move(params))
     {
-        switch (type)
-        {
-        case Join:
-            method_ = "join";
-            break;
-        case Get:
-            method_ = "get";
-            break;
-        case Put:
-            method_ = "put";
-            break;
-        case SetPre:
-            method_ = "setpre";
-            break;
-        case SetSuc:
-            method_ = "setsuc";
-            break;
-        }
-    }
-
-    Message(Type type, std::string method, std::vector<std::string> params)
-      : type_(type)
-      , method_(std::move(method))
-      , params_(std::move(params))
-    {
         // ...
     }
 
     std::string to_str() const
     {
-        auto result = method_;
+        std::string result(1, char(type_));
         for (auto &param : params_)
         {
             result += ',' + param;
@@ -127,14 +78,12 @@ class Message
     }
 
     Type type() const { return type_; }
-    const std::string &method() const { return method_; }
     const std::vector<std::string> &params() const { return params_; }
     const std::string &operator[](std::size_t ind_of_param) const
     { return params_[ind_of_param]; }
 
   private:
     Type type_;
-    std::string method_;
     std::vector<std::string> params_;
 };
 } // namespace chord
