@@ -14,27 +14,31 @@ class FingerTable
     static constexpr std::size_t M = sizeof(std::size_t) * 8;
 
   public:
-    FingerTable(std::size_t base)
-      : base_(base)
+    FingerTable(const icarus::InetAddress &addr)
+      : self_(addr)
     {
-        // ...
+        for (auto &node : nodes_)
+        {
+            node = Node(addr);
+        }
     }
 
-    std::vector<Node>
-    insert(const icarus::InetAddress &addr);
+    const Node &find(const Node &node);
 
-    std::vector<Node>
-    insert(const Node &node);
+    void insert(const Node &node);
 
-    bool find(const Node &node);
-
-    std::size_t base() const
+    const Node &self() const
     {
-        return base_;
+        return self_;
+    }
+
+    const std::array<Node, M> &nodes() const
+    {
+        return nodes_;
     }
 
   private:
-    std::size_t base_;
+    Node self_;
     std::array<Node, M> nodes_;
 };
 } // namespace chord
