@@ -173,7 +173,7 @@ class Server
 
     }
 
-    void on_message(const icarus::TcpConnectionPtr &conn, Buffer *buf)
+    void on_message(const icarus::TcpConnectionPtr &conn, icarus::Buffer *buf)
     {
         auto res = Message::parse(buf);
         if (!res.has_value())
@@ -287,7 +287,7 @@ class Server
                     conn->send(send_str);
                 }
             });
-            client.set_message_callback([this, &result, &loop] (const icarus::TcpConnectionPtr &conn, Buffer *buf)
+            client.set_message_callback([this, &result, &loop] (const icarus::TcpConnectionPtr &conn, icarus::Buffer *buf)
             {
                 auto res = Message::parse(buf);
                 if (!res.has_value())
@@ -349,7 +349,7 @@ class Server
                     ).to_str();
                 }
             });
-            client.set_message_callback([this, &successor, &loop] (const icarus::TcpConnectionPtr &conn, Buffer *buf)
+            client.set_message_callback([this, &successor, &loop] (const icarus::TcpConnectionPtr &conn, icarus::Buffer *buf)
             {
                 auto res = Message::parse(buf);
                 if (!res.has_value())
