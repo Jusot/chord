@@ -23,6 +23,9 @@ class FingerTable
         }
     }
 
+    /**
+     * return the last node which is less than the given node
+    */
     const Node &find(const Node &node);
 
     void insert(const Node &node);
