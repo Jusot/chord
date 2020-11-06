@@ -116,7 +116,10 @@ class Server
                 static_cast<std::uint16_t>(std::stoi(msg[1]))
             ));
             this->successor_ = successor;
-
+            successor.send_message(Message(
+                Message::Notify,
+                { std::to_string(this->listen_addr_.to_port()) }
+            ));
 
             conn->shutdown();
             finish = true;

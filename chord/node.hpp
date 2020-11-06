@@ -31,6 +31,45 @@ class Node
         // ...
     }
 
+    /**
+     * only send in a detached thread
+    */
+    void send_message(const Message &msg)
+    {
+        std::thread send_thread([=]
+        {
+            icarus::EventLoop loop;
+            icarus::TcpClient client(&loop, addr_, "chord client");
+
+            /**
+             * set callbacks
+            */
+            client.set_connection_callback([=] (const icarus::TcpConnectionPtr &conn)
+            {
+                conn->send(msg.to_str() + "\r\n");
+            });
+            client.set_write_complete_callback([&] (const icarus::TcpConnectionPtr &conn)
+            {
+                conn->shutdown();
+                loop.quit();
+            });
+
+            /*
+            std::thread timer([&loop]
+            {
+                std::this_thread::sleep_for(std::chrono::seconds(3));
+                loop.quit();
+            });
+            timer.detach();
+            */
+
+            client.connect();
+            loop.loop();
+        });
+
+        send_thread.detach();
+    }
+
     std::size_t hash_value() const
     {
         return hash_value_;
