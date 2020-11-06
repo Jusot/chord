@@ -146,6 +146,11 @@ class Server
         {
             std::cout << "[ESTABILISHED SUCCESSFULLY]" << std::endl;
             established_ = true;
+
+            /**
+             * TODO: init finger table from the successor
+            */
+
             std::thread stabilize_thread([this]
             {
                 this->stabilize();
@@ -168,9 +173,6 @@ class Server
 
     }
 
-    /**
-     * join: insert it directly if received node is between the current node and the successor
-    */
     void on_message(const icarus::TcpConnectionPtr &conn, Buffer *buf)
     {
         auto res = Message::parse(buf);
@@ -315,6 +317,12 @@ class Server
         }
     }
 
+    /**
+     * in stabilization:
+     *  1. ask the predecessor of the successor
+     *  2. update the successor by the got predecessor
+     *      if the predecessor of the successor is not self
+    */
     void stabilize()
     {
         while (true)
@@ -360,7 +368,10 @@ class Server
             client.connect();
             loop.loop();
 
-            successor_ = successor;
+            if (successor.between(table_.self(), successor_))
+            {
+                successor_ = successor;
+            }
         }
     }
 
