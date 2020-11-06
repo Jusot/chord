@@ -94,11 +94,11 @@ class Server
             */
             if (conn->connected())
             {
-                auto send_str = Message(Message::Join, { std::to_string(this->listen_addr_.to_port()) }).to_str() + "\r\n";
+                auto send_str = Message(Message::Join, { std::to_string(this->listen_addr_.to_port()) }).to_str();
                 conn->send(send_str);
             }
         });
-        client.set_message_callback([&finish, this] (const icarus::TcpConnectionPtr &conn, icarus::Buffer *buf)
+        client.set_message_callback([this, &finish] (const icarus::TcpConnectionPtr &conn, icarus::Buffer *buf)
         {
             auto res = Message::parse(buf);
             if (!res.has_value())
@@ -116,10 +116,6 @@ class Server
                 static_cast<std::uint16_t>(std::stoi(msg[1]))
             ));
             this->successor_ = successor;
-            successor.send_message(Message(
-                Message::Notify,
-                { std::to_string(this->listen_addr_.to_port()) }
-            ));
 
             conn->shutdown();
             finish = true;
@@ -149,8 +145,12 @@ class Server
         if (finish)
         {
             std::cout << "[ESTABILISHED SUCCESSFULLY]" << std::endl;
-
             established_ = true;
+            std::thread stabilize_thread([this]
+            {
+                this->stabilize();
+            });
+            stabilize_thread.detach();
         }
         else
         {
@@ -185,6 +185,12 @@ class Server
         case Message::Join:
             on_message_join(conn, message);
             break;
+        case Message::Notify:
+            on_message_notify(conn, message);
+            break;
+        case Message::FindSuc:
+            on_message_findsuc(conn, message);
+            break;
         case Message::Get:
             on_message_get(conn, message);
             break;
@@ -198,37 +204,38 @@ class Server
     {
         auto src_ip = conn->peer_address().to_ip();
         auto src_port = static_cast<std::uint16_t>(std::stoi(msg[0]));
-        auto peer_addr = icarus::InetAddress(src_ip.c_str(), src_port);
-        Node node(peer_addr);
-
-        if (node.between(table_.self(), successor_))
-        {
-            conn->send(Message(
-                Message::Join,
-                {
-                    successor_.addr().to_ip(),
-                    std::to_string(successor_.addr().to_port())
-                }
-            ).to_str() + "\r\n");
-            successor_ = node;
-            table_.insert(node);
-        }
-        else
-        {
-            /**
-             * TODO: find the successor of the node
-            */
-        }
+        auto src_addr = icarus::InetAddress(src_ip.c_str(), src_port);
+        conn->send(find_successor(src_addr).to_str());
     }
 
-    void on_message_insert(const icarus::TcpConnectionPtr &conn, const Message &msg)
+    void on_message_notify(const icarus::TcpConnectionPtr &conn, const Message &msg)
     {
+        auto src_ip = conn->peer_address().to_ip();
+        auto src_port = static_cast<std::uint16_t>(std::stoi(msg[0]));
+        auto src_addr = icarus::InetAddress(src_ip.c_str(), src_port);
+        auto src_node = Node(src_addr);
 
+        if (src_node.between(predecessor_, table_.self()))
+        {
+            predecessor_ = src_node;
+        }
+
+        auto send_str = Message(
+            Message::Notify,
+            {
+                predecessor_.addr().to_ip(),
+                std::to_string(predecessor_.addr().to_port())
+            }
+        ).to_str();
+        conn->send(send_str);
     }
 
-    void on_message_delete(const icarus::TcpConnectionPtr &conn, const Message &msg)
+    void on_message_findsuc(const icarus::TcpConnectionPtr &conn, const Message &msg)
     {
-
+        auto src_ip = msg[0];
+        auto src_port = static_cast<std::uint16_t>(std::stoi(msg[1]));
+        icarus::InetAddress src_addr(src_ip.c_str(), src_port);
+        conn->send(find_successor(src_addr).to_str());
     }
 
     void on_message_get(const icarus::TcpConnectionPtr &conn, const Message &msg)
@@ -239,6 +246,127 @@ class Server
     void on_message_put(const icarus::TcpConnectionPtr &conn, const Message &msg)
     {
         // ...
+    }
+
+    Message find_successor(const Node &node)
+    {
+        /**
+         * if node is the direct successor
+        */
+        if (node.between(table_.self(), successor_))
+        {
+            return Message(
+                Message::FindSuc,
+                {
+                    successor_.addr().to_ip(),
+                    std::to_string(successor_.addr().to_port())
+                }
+            );
+        }
+        else
+        {
+            auto ask_node = table_.find(node);
+
+            std::optional<Message> result;
+            icarus::EventLoop loop;
+            icarus::TcpClient client(&loop, ask_node.addr(), "chord client");
+
+            client.set_connection_callback([this, node] (const icarus::TcpConnectionPtr &conn)
+            {
+                if (conn->connected())
+                {
+                    auto send_str = Message(
+                        Message::FindSuc,
+                        {
+                            node.addr().to_ip(),
+                            std::to_string(node.addr().to_port())
+                        }
+                    ).to_str();
+                    conn->send(send_str);
+                }
+            });
+            client.set_message_callback([this, &result, &loop] (const icarus::TcpConnectionPtr &conn, Buffer *buf)
+            {
+                auto res = Message::parse(buf);
+                if (!res.has_value())
+                {
+                    return;
+                }
+
+                result = res;
+                conn->shutdown();
+                loop.quit();
+            });
+
+            client.connect();
+            loop.loop();
+
+            if (result.has_value())
+            {
+                return result.value();
+            }
+            else
+            {
+                /**
+                 * TODO: fix finger table and refind
+                */
+                return result.value(); // ERROR NOW
+            }
+        }
+    }
+
+    void stabilize()
+    {
+        while (true)
+        {
+            std::this_thread::sleep_for(std::chrono::seconds(5));
+
+            /**
+             * notify the successor, update the successor
+             *  and fix the finger table
+            */
+            Node successor;
+            icarus::EventLoop loop;
+            icarus::TcpClient client(&loop, successor_.addr(), "chord client");
+
+            client.set_connection_callback([this] (const icarus::TcpConnectionPtr &conn)
+            {
+                if (conn->connected())
+                {
+                    auto send_str = Message(
+                        Message::Notify,
+                        {
+                            std::to_string(this->listen_addr_.to_port())
+                        }
+                    ).to_str();
+                }
+            });
+            client.set_message_callback([this, &successor, &loop] (const icarus::TcpConnectionPtr &conn, Buffer *buf)
+            {
+                auto res = Message::parse(buf);
+                if (!res.has_value())
+                {
+                    return;
+                }
+
+                auto msg = res.value();
+                successor = Node(icarus::InetAddress(
+                    msg[0].c_str(),
+                    static_cast<std::uint16_t>(std::stoi(msg[1]))
+                ));
+                loop.quit();
+            });
+
+            client.connect();
+            loop.loop();
+
+            successor_ = successor;
+        }
+    }
+
+    void fix_finger_table()
+    {
+
     }
 
   private:
