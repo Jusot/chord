@@ -19,10 +19,9 @@ class Message
     */
     enum Type : char
     {
-        Join, // ,src_port | ,suc_ip,peer_port
-        Notify, // ,src_port | ,pre_ip,pre_port
-
-        FindSuc, // ,src_ip,src_port | suc_ip,suc_port
+        Join, // ,src_port >> ,suc_ip,peer_port
+        Notify, // ,src_port >> ,pre_ip,pre_port
+        FindSuc, // ,src_ip,src_port >> ,suc_ip,suc_port
 
         Get,
         Put,
@@ -75,7 +74,7 @@ class Message
         {
             result += ',' + param;
         }
-        return result;
+        return result + "\r\n";
     }
 
     Type type() const { return type_; }
