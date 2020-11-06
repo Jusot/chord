@@ -22,7 +22,9 @@ class Server
 {
   public:
     Server(icarus::EventLoop *loop, const icarus::InetAddress &listen_addr)
-      : table_(std::hash<std::string>{}(listen_addr.to_ip_port()))
+      : predecessor_(listen_addr)
+      , successor_(listen_addr)
+      , table_(listen_addr)
       , established_(false)
       , listen_addr_(listen_addr)
       , tcp_server_(loop, listen_addr, "chord server")
@@ -96,7 +98,7 @@ class Server
                 conn->send(send_str);
             }
         });
-        client.set_message_callback([&finish] (const icarus::TcpConnectionPtr &conn, icarus::Buffer *buf)
+        client.set_message_callback([&finish, this] (const icarus::TcpConnectionPtr &conn, icarus::Buffer *buf)
         {
             auto res = Message::parse(buf);
             if (!res.has_value())
@@ -105,8 +107,17 @@ class Server
             }
 
             /**
-             * TODO: resolve message
+             * as expected,
+             *  it will return the successor of current node
             */
+            auto msg = Message::parse(buf).value();
+            Node successor(icarus::InetAddress(
+                msg[0].c_str(),
+                static_cast<std::uint16_t>(std::stoi(msg[1]))
+            ));
+            this->successor_ = successor;
+
+
             conn->shutdown();
             finish = true;
         });
@@ -171,9 +182,6 @@ class Server
         case Message::Join:
             on_message_join(conn, message);
             break;
-        case Message::Insert:
-            on_message_insert(conn, message);
-            break;
         case Message::Get:
             on_message_get(conn, message);
             break;
@@ -188,48 +196,26 @@ class Server
         auto src_ip = conn->peer_address().to_ip();
         auto src_port = static_cast<std::uint16_t>(std::stoi(msg[0]));
         auto peer_addr = icarus::InetAddress(src_ip.c_str(), src_port);
-
         Node node(peer_addr);
-        if (table_.find(node))
-        {
-            return;
-        }
 
-        if (predecessor_.has_value())
+        if (node.between(table_.self(), successor_))
+        {
+            conn->send(Message(
+                Message::Join,
+                {
+                    successor_.addr().to_ip(),
+                    std::to_string(successor_.addr().to_port())
+                }
+            ).to_str() + "\r\n");
+            successor_ = node;
+            table_.insert(node);
+        }
+        else
         {
             /**
-             * this is detached
-             *  and we assume the predecessor is alive
+             * TODO: find the successor of the node
             */
-            send_message(predecessor_.addr(), Message(
-                Message::Insert,
-                {
-                    peer_addr.to_ip(),
-                    std::to_string(peer_addr.to_port())
-                })
-            );
-
-            if (predecessor_.hash_value() < node.hash_value() && node.hash_value() < table_.base())
-            {
-                predecessor_ = node;
-            }
         }
-        else
-        {
-            predecessor_ = node;
-        }
-
-        if (successor_.has_value())
-        {
-
-        }
-        else
-        {
-            successor_ = node;
-        }
-
-        auto send_str = Message(Message::Join, {"success"}).to_str() + "\r\n";
-        conn->send(send_str);
     }
 
     void on_message_insert(const icarus::TcpConnectionPtr &conn, const Message &msg)
@@ -250,46 +236,6 @@ class Server
     void on_message_put(const icarus::TcpConnectionPtr &conn, const Message &msg)
     {
         // ...
-    }
-
-    /**
-     * only send message in a detached thread
-     *  and the peer is assumed alive so that we just send
-    */
-    void send_message(const icarus::InetAddress &addr, const Message &msg)
-    {
-        std::thread send_thread([=]
-        {
-            icarus::EventLoop loop;
-            icarus::TcpClient client(&loop, addr, "chord client");
-
-            /**
-             * set callbacks
-            */
-            client.set_connection_callback([=] (const icarus::TcpConnectionPtr &conn)
-            {
-                conn->send(msg.to_str() + "\r\n");
-            });
-            client.set_write_complete_callback([&] (const icarus::TcpConnectionPtr &conn)
-            {
-                conn->shutdown();
-                loop.quit();
-            });
-
-            /*
-            std::thread timer([&loop]
-            {
-                std::this_thread::sleep_for(std::chrono::seconds(3));
-                loop.quit();
-            });
-            timer.detach();
-            */
-
-            client.connect();
-            loop.loop();
-        });
-
-        send_thread.detach();
     }
 
   private:
