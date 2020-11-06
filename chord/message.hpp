@@ -19,9 +19,10 @@ class Message
     */
     enum Type : char
     {
-        Join, // 0,src_port
-        Insert, // 1,src_ip,src_port
-        Delete, // 2,src_port
+        Join, // ,src_port | ,suc_ip,peer_port
+        Notify, // ,src_port | ,pre_ip,pre_port
+
+        FindSuc, // ,src_ip,src_port | suc_ip,suc_port
 
         Get,
         Put,
