@@ -56,6 +56,11 @@ class Node
         return hash_value_ == rhs.hash_value_;
     }
 
+    bool between(const Node &pre, const Node &suc) const
+    {
+        return between(pre.hash_value_, suc.hash_value_);
+    }
+
     /**
      * >.>.>.>.>.>.>.>.>.>.
      * pre .<. this .<. suc
@@ -64,19 +69,19 @@ class Node
      * >.>.>.> this .>.>.>.
      * suc .<.<.<.<.<.< pre
     */
-    bool between(const Node &pre, const Node &suc) const
+    bool between(std::size_t pre, std::size_t suc) const
     {
         if (pre == suc)
         {
             return true;
         }
-        else if (pre.hash_value_ < suc.hash_value_)
+        else if (pre < suc)
         {
-            return pre.hash_value_ < hash_value_ && hash_value_ < suc.hash_value_;
+            return pre < hash_value_ && hash_value_ < suc;
         }
         else
         {
-            return pre.hash_value_ < hash_value_ || hash_value_ < suc.hash_value_;
+            return pre < hash_value_ || hash_value_ < suc;
         }
     }
 
