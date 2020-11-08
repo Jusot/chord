@@ -27,7 +27,7 @@ class FingerTable
     /**
      * return the last node which is less than the given node
     */
-    const Node &find(const Node &node)
+    const Node &find(const Node &node) const
     {
         /**
          * loop until the ith node is not between self and the given node
@@ -45,7 +45,25 @@ class FingerTable
         return nodes_[i - 1];
     }
 
-    void insert(const Node &node);
+    /**
+     * simply traverse each position in current version
+    */
+    void insert(const Node &node)
+    {
+        auto base = self_.hash_value();
+        for (std::size_t i = 0; i < M; ++i)
+        {
+            auto anchor = base + (1ull << i);
+            if (node.hash_value() == anchor)
+            {
+                nodes_[i] = node;
+            }
+            else if (node.between(anchor, nodes_[i].hash_value()))
+            {
+                nodes_[i] = node;
+            }
+        }
+    }
 
     const Node &self() const
     {
