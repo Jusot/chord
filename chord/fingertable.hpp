@@ -24,20 +24,25 @@ class FingerTable
         }
     }
 
-    /**
-     * return the last node which is less than the given node
-    */
     const Node &find(const Node &node) const
     {
+        return find(node.hash_value());
+    }
+
+    /**
+     * return the last node which is less than the given hash_value
+    */
+    const Node &find(std::size_t hash_value) const
+    {
         /**
-         * loop until the ith node is not between self and the given node
-         *  because self < ith-node < node means ith-node is less than node
+         * loop until the ith node is not between self and the given hash_value
+         *  because self < ith-node < hash_value means ith-node is less than hash_value
         */
         size_t i = 0;
-        for (; i < M && nodes_[i].between(self_, node); ++i);
+        for (; i < M && nodes_[i].between(self_.hash_value(), hash_value); ++i);
 
         /**
-         * find will be called after checking the node is between self and its successor or not
+         * find will be called after checking the hash_value is between self and its successor or not
          *  so i cannot be 0
         */
         assert(i != 0);
