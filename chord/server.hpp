@@ -234,10 +234,10 @@ class Server
 
     void on_message_findsuc(const icarus::TcpConnectionPtr &conn, const Message &msg)
     {
-        auto src_ip = msg[0];
-        auto src_port = static_cast<std::uint16_t>(std::stoi(msg[1]));
-        icarus::InetAddress src_addr(src_ip.c_str(), src_port);
-        conn->send(find_successor(src_addr).to_str());
+        /**
+         * msg[0] is the hash value
+        */
+        conn->send(find_successor(msg[0]).to_str());
     }
 
     void on_message_get(const icarus::TcpConnectionPtr &conn, const Message &msg)
@@ -250,12 +250,12 @@ class Server
         // ...
     }
 
-    Message find_successor(const Node &node)
+    Message find_successor(const HashType &hash)
     {
         /**
-         * if node is the direct successor
+         * if hash is between self and the direct successor
         */
-        if (node.between(table_.self(), successor_))
+        if (hash.between(table_.self().hash(), successor_.hash()))
         {
             return Message(
                 Message::FindSuc,
@@ -267,21 +267,20 @@ class Server
         }
         else
         {
-            auto ask_node = table_.find(node);
+            auto ask_node = table_.find(hash);
 
             std::optional<Message> result;
             icarus::EventLoop loop;
             icarus::TcpClient client(&loop, ask_node.addr(), "chord client");
 
-            client.set_connection_callback([this, node] (const icarus::TcpConnectionPtr &conn)
+            client.set_connection_callback([this, hash] (const icarus::TcpConnectionPtr &conn)
             {
                 if (conn->connected())
                 {
                     auto send_str = Message(
                         Message::FindSuc,
                         {
-                            node.addr().to_ip(),
-                            std::to_string(node.addr().to_port())
+                            hash.to_str()
                         }
                     ).to_str();
                     conn->send(send_str);
@@ -333,7 +332,7 @@ class Server
              * notify the successor, update the successor
              *  and fix the finger table
             */
-            Node successor;
+            std::optional<Message> recv_res;
             icarus::EventLoop loop;
             icarus::TcpClient client(&loop, successor_.addr(), "chord client");
 
@@ -349,28 +348,32 @@ class Server
                     ).to_str();
                 }
             });
-            client.set_message_callback([this, &successor, &loop] (const icarus::TcpConnectionPtr &conn, icarus::Buffer *buf)
+            client.set_message_callback([this, &recv_res, &loop] (const icarus::TcpConnectionPtr &conn, icarus::Buffer *buf)
             {
                 auto res = Message::parse(buf);
                 if (!res.has_value())
                 {
                     return;
                 }
-
-                auto msg = res.value();
-                successor = Node(icarus::InetAddress(
-                    msg[0].c_str(),
-                    static_cast<std::uint16_t>(std::stoi(msg[1]))
-                ));
+                recv_res = std::move(res);
                 loop.quit();
             });
 
             client.connect();
             loop.loop();
 
-            if (successor.between(table_.self(), successor_))
+            if (recv_res.has_value())
             {
-                successor_ = successor;
+                auto msg = recv_res.value();
+                auto successor = Node(icarus::InetAddress(
+                    msg[0].c_str(),
+                    static_cast<std::uint16_t>(std::stoi(msg[1]))
+                ));
+
+                if (successor.between(table_.self(), successor_))
+                {
+                    successor_ = successor;
+                }
             }
 
             fix_finger_table();

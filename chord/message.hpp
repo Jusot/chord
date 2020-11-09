@@ -21,7 +21,7 @@ class Message
     {
         Join, // ,src_port >> ,suc_ip,peer_port
         Notify, // ,src_port >> ,pre_ip,pre_port
-        FindSuc, // ,src_ip,src_port >> ,suc_ip,suc_port
+        FindSuc, // ,hash_value >> ,suc_ip,suc_port
 
         Get,
         Put,
