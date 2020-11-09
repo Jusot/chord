@@ -372,6 +372,8 @@ class Server
             {
                 successor_ = successor;
             }
+
+            fix_finger_table();
         }
     }
 
