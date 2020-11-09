@@ -329,50 +329,64 @@ class Server
             std::this_thread::sleep_for(std::chrono::seconds(5));
 
             /**
-             * notify the successor, update the successor
-             *  and fix the finger table
+             * check the predecessor directly if the successor is self
             */
-            std::optional<Message> recv_res;
-            icarus::EventLoop loop;
-            icarus::TcpClient client(&loop, successor_.addr(), "chord client");
-
-            client.set_connection_callback([this] (const icarus::TcpConnectionPtr &conn)
+            if (successor_ == table_.self())
             {
-                if (conn->connected())
-                {
-                    auto send_str = Message(
-                        Message::Notify,
-                        {
-                            std::to_string(this->listen_addr_.to_port())
-                        }
-                    ).to_str();
-                }
-            });
-            client.set_message_callback([this, &recv_res, &loop] (const icarus::TcpConnectionPtr &conn, icarus::Buffer *buf)
-            {
-                auto res = Message::parse(buf);
-                if (!res.has_value())
-                {
-                    return;
-                }
-                recv_res = std::move(res);
-                loop.quit();
-            });
-
-            client.connect();
-            loop.loop();
-
-            if (recv_res.has_value())
-            {
-                auto msg = recv_res.value();
-                auto successor = Node(icarus::InetAddress(
-                    msg[0].c_str(),
-                    static_cast<std::uint16_t>(std::stoi(msg[1]))
-                ));
-
+                auto successor = predecessor_;
                 if (successor.between(table_.self(), successor_))
                 {
                     successor_ = successor;
+                }
+            }
+            else
+            {
+                /**
+                 * notify the successor, update the successor
+                 *  and fix the finger table
+                */
+                std::optional<Message> recv_res;
+                icarus::EventLoop loop;
+                icarus::TcpClient client(&loop, successor_.addr(), "chord client");
+
+                client.set_connection_callback([this] (const icarus::TcpConnectionPtr &conn)
+                {
+                    if (conn->connected())
+                    {
+                        auto send_str = Message(
+                            Message::Notify,
+                            {
+                                std::to_string(this->listen_addr_.to_port())
+                            }
+                        ).to_str();
+                    }
+                });
+                client.set_message_callback([this, &recv_res, &loop] (const icarus::TcpConnectionPtr &conn, icarus::Buffer *buf)
+                {
+                    auto res = Message::parse(buf);
+                    if (!res.has_value())
+                    {
+                        return;
+                    }
+                    recv_res = std::move(res);
+                    loop.quit();
+                });
+
+                client.connect();
+                loop.loop();
+
+                if (recv_res.has_value())
+                {
+                    auto msg = recv_res.value();
+                    auto successor = Node(icarus::InetAddress(
+                        msg[0].c_str(),
+                        static_cast<std::uint16_t>(std::stoi(msg[1]))
+                    ));
+
+                    if (successor.between(table_.self(), successor_))
+                    {
+                        successor_ = successor;
+                    }
                 }
             }
 
