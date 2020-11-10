@@ -17,50 +17,14 @@ class Instruction
         Quit, // quit
     };
 
-    static std::optional<Instruction> parse(const std::string &ins)
-    {
-        std::size_t pos = ins.find(' ');
+    static std::optional<Instruction>
+    parse(const std::string &ins);
 
-        Type type;
-        auto type_str = ins.substr(0, pos);
-        auto value = ins.substr(pos + 1);
-
-        if (type_str == "join")
-        {
-            type = Join;
-            /**
-             * TODO: catch join-ins with wrong value
-            */
-        }
-        else if (type_str == "get")
-        {
-            type = Get;
-        }
-        else if (type_str == "put")
-        {
-            type = Put;
-        }
-        else if (type_str == "quit")
-        {
-            type = Quit;
-        }
-        else
-        {
-            return {};
-        }
-
-        return Instruction(type, std::move(value));
-    }
-
-    Type type() const { return type_; }
-    const std::string &value() const { return value_; }
+    Type type() const;
+    const std::string &value() const;
 
   private:
-    Instruction(Type type, std::string value)
-      : type_(type), value_(std::move(value))
-    {
-        // ...
-    }
+    Instruction(Type type, std::string value);
 
   private:
     Type type_;

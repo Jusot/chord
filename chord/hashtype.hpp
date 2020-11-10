@@ -2,8 +2,7 @@
 #define __CHORD_HASHTYPE_HPP__
 
 #include <string>
-#include <cctype>
-#include <functional>
+#include <cstddef>
 #include <icarus/inetaddress.hpp>
 
 namespace chord
@@ -14,77 +13,19 @@ namespace chord
 class HashType
 {
   public:
-    HashType(std::size_t value)
-      : value_(value)
-    {
-        // ...
-    }
+    HashType(std::size_t value);
+    HashType(const icarus::InetAddress &addr);
+    HashType(const HashType &other);
 
-    HashType(const icarus::InetAddress &addr)
-      : HashType(std::hash<std::string>{}(addr.to_ip_port()))
-    {
-        // ...
-    }
+    bool between(HashType pre, HashType suc) const;
 
-    HashType(const HashType &other)
-      : value_(other.value_)
-    {
-        // ...
-    }
+    bool operator==(const HashType &rhs) const;
+    bool operator!=(const HashType &rhs) const;
+    bool operator<(const HashType &rhs) const;
+    HashType operator+(const HashType &rhs) const;
 
-    /**
-     * >.>.>.>.>.>.>.>.>.>.
-     * pre .<. this .<. suc
-     *
-     * 0        ||        0
-     * >.>.>.> this .>.>.>.
-     * suc .<.<.<.<.<.< pre
-    */
-    bool between(HashType pre, HashType suc) const
-    {
-        if (pre == suc)
-        {
-            return true;
-        }
-        else if (pre < suc)
-        {
-            return pre.value_ < value_ && value_ < suc.value_;
-        }
-        else
-        {
-            return pre.value_ < value_ || value_ < suc.value_;
-        }
-    }
-
-    bool operator==(const HashType &rhs) const
-    {
-        return value_ == rhs.value_;
-    }
-
-    bool operator!=(const HashType &rhs) const
-    {
-        return value_ != rhs.value_;
-    }
-
-    bool operator<(const HashType &rhs) const
-    {
-        return value_ < rhs.value_;
-    }
-
-    HashType operator+(const HashType &rhs) const
-    {
-        return HashType(value_ + rhs.value_);
-    }
-
-    std::size_t value() const
-    {
-        return value_;
-    }
-
-    std::string to_str() const
-    {
-        return std::to_string(value_);
-    }
+    std::size_t value() const;
+    std::string to_str() const;
 
   private:
     /**
