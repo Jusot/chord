@@ -29,8 +29,8 @@ class Message
         PreQuit, // ,pre_ip,pre_port
         SucQuit, // ,suc_ip,suc_port
 
-        Get,
-        Put,
+        Get, // ,file_name >> data
+        Put, // ,src_port,file_name
     };
 
     static std::optional<Message> parse(const std::string &message);
@@ -40,6 +40,8 @@ class Message
     Message(Type type, std::uint16_t port);
     Message(Type type, const icarus::InetAddress &addr);
     Message(Type type, const HashType &hash);
+    Message(const std::string &filename);
+    Message(std::uint16_t port, const std::string &filename);
 
     std::string to_str() const;
     std::uint16_t       param_as_port(std::size_t i = 0) const;

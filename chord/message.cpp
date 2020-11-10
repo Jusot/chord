@@ -57,6 +57,20 @@ Message::Message(Type type, const HashType &hash)
     // ...
 }
 
+Message::Message(const std::string &filename)
+  : type_(Get)
+  , params_({filename})
+{
+    // ...
+}
+
+Message::Message(std::uint16_t port, const std::string &filename)
+  : type_(Put)
+  , params_({std::to_string(port), filename})
+{
+    // ...
+}
+
 std::string Message::to_str() const
 {
     std::string result(1, char(type_));
