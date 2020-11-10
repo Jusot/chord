@@ -19,19 +19,29 @@ const Node &FingerTable::find(const Node &node) const
 
 const Node &FingerTable::find(const HashType &hash) const
 {
-    /**
-     * loop until the ith node is not between self and the given hash_value
-     *  because self < ith-node < hash_value means ith-node is less than hash_value
-    */
-    size_t i = 0;
-    for (; i < M && nodes_[i].between(self_.hash(), hash); ++i);
-
-    /**
-     * find will be called after checking the hash_value is between self and its successor or not
-     *  so i cannot be 0
-    */
-    assert(i != 0);
-    return nodes_[i - 1];
+    std::size_t ind = 0, dis = -1;
+    constexpr std::size_t max = -1;
+    for (std::size_t i = 0; i < M; ++i)
+    {
+        auto now = nodes_[i].hash().value();
+        if (now <= hash.value())
+        {
+            if (hash.value() - now < dis)
+            {
+                dis = hash.value() - now;
+                ind = i;
+            }
+        }
+        else
+        {
+            if (hash.value() + max - now < dis)
+            {
+                dis = hash.value() + max - now;
+                ind = 1;
+            }
+        }
+    }
+    return nodes_[ind];
 }
 
 void FingerTable::insert(const Node &node)
@@ -43,11 +53,7 @@ void FingerTable::insert(const Node &node)
     for (std::size_t i = 0; i < M; ++i)
     {
         auto anchor = base + (1ull << i);
-        if (node.hash() == anchor)
-        {
-            nodes_[i] = node;
-        }
-        else if (node.between(anchor, nodes_[i].hash()))
+        if (node.between(anchor, nodes_[i].hash()))
         {
             nodes_[i] = node;
         }
