@@ -2,6 +2,7 @@
 #define __CHORD_SERVER_HPP__
 
 #include "node.hpp"
+#include "client.hpp"
 #include "message.hpp"
 #include "instruction.hpp"
 #include "fingertable.hpp"
@@ -73,94 +74,50 @@ class Server
         auto pos = value.find(':');
         auto dst_ip = value.substr(0, pos);
         auto dst_port = static_cast<std::uint16_t>(std::stoi(value.substr(pos + 1)));
-        auto src_port = listen_addr_.to_port();
+        auto dst_addr = icarus::InetAddress(dst_ip.c_str(), dst_port);
 
-        /**
-         * wait here until things are ok or wrong
-        */
-        bool finish = false;
-        icarus::EventLoop loop;
-        icarus::InetAddress server_addr(dst_ip.c_str(), dst_port);
-        icarus::TcpClient client(&loop, server_addr, "chord client");
+        Client client(dst_addr, std::chrono::seconds(3));
 
-        /**
-         * set callbacks
-        */
-        client.set_connection_callback([this] (const icarus::TcpConnectionPtr &conn)
+        client.set_timeout_callback([this] (bool timeout, const std::optional<Message> &result)
         {
-            /**
-             * when connection is connected,
-             *  we will send a message `join,src_port`
-            */
-            if (conn->connected())
+            if (!timeout)
             {
-                auto send_str = Message(Message::Join, { std::to_string(this->listen_addr_.to_port()) }).to_str();
-                conn->send(send_str);
+                /**
+                 * assume the result is correct
+                */
+                auto msg = result.value();
+                Node successor(icarus::InetAddress(
+                    msg[0].c_str(),
+                    static_cast<std::uint16_t>(std::stoi(msg[1]))
+                ));
+                this->successor_ = successor;
+
+                std::cout << "[ESTABILISHED SUCCESSFULLY]" << std::endl;
+                established_ = true;
+
+                /**
+                 * TODO: init finger table from the successor
+                */
+
+                std::thread stabilize_thread([this]
+                {
+                    this->stabilize();
+                });
+                stabilize_thread.detach();
+            }
+            else
+            {
+                std::cout << "[FAILED CONNECTION]" << std::endl;
             }
         });
-        client.set_message_callback([this, &finish] (const icarus::TcpConnectionPtr &conn, icarus::Buffer *buf)
-        {
-            auto res = Message::parse(buf);
-            if (!res.has_value())
-            {
-                return;
-            }
-
-            /**
-             * as expected,
-             *  it will return the successor of current node
-            */
-            auto msg = Message::parse(buf).value();
-            Node successor(icarus::InetAddress(
-                msg[0].c_str(),
-                static_cast<std::uint16_t>(std::stoi(msg[1]))
-            ));
-            this->successor_ = successor;
-
-            conn->shutdown();
-            finish = true;
-        });
-        client.enable_retry();
 
         std::cout << "CONNECTING..." << std::endl;
-        std::thread timer([&loop]
-        {
-            /**
-             * TODO: unsafe, may involve more states
-            */
-            std::this_thread::sleep_for(std::chrono::seconds(3));
-            loop.quit();
-        });
-        timer.detach();
-
-        /**
-         * loop until the process is finished
-        */
-        client.connect();
-        loop.loop();
-
-        /**
-         * after loop quits
-        */
-        if (finish)
-        {
-            std::cout << "[ESTABILISHED SUCCESSFULLY]" << std::endl;
-            established_ = true;
-
-            /**
-             * TODO: init finger table from the successor
-            */
-
-            std::thread stabilize_thread([this]
+        client.send_and_wait_response(Message(
+            Message::Join,
             {
-                this->stabilize();
-            });
-            stabilize_thread.detach();
-        }
-        else
-        {
-            std::cout << "[FAILED CONNECTION]" << std::endl;
-        }
+                std::to_string(listen_addr_.to_port())
+            }
+        ));
     }
 
     void handle_instruction_get(const std::string &value)
@@ -268,39 +225,14 @@ class Server
         else
         {
             auto ask_node = table_.find(hash);
+            Client client(ask_node.addr());
 
-            std::optional<Message> result;
-            icarus::EventLoop loop;
-            icarus::TcpClient client(&loop, ask_node.addr(), "chord client");
-
-            client.set_connection_callback([this, hash] (const icarus::TcpConnectionPtr &conn)
-            {
-                if (conn->connected())
+            auto result = client.send_and_wait_response(Message(
+                Message::FindSuc,
                 {
-                    auto send_str = Message(
-                        Message::FindSuc,
-                        {
-                            hash.to_str()
-                        }
-                    ).to_str();
-                    conn->send(send_str);
+                    hash.to_str()
                 }
-            });
-            client.set_message_callback([this, &result, &loop] (const icarus::TcpConnectionPtr &conn, icarus::Buffer *buf)
-            {
-                auto res = Message::parse(buf);
-                if (!res.has_value())
-                {
-                    return;
-                }
-
-                result = res;
-                conn->shutdown();
-                loop.quit();
-            });
-
-            client.connect();
-            loop.loop();
+            ));
 
             if (result.has_value())
             {
@@ -309,9 +241,9 @@ class Server
             else
             {
                 /**
-                 * TODO: fix finger table and refind
+                 * what happened
                 */
-                return result.value(); // ERROR NOW
+                abort();
             }
         }
     }
@@ -345,39 +277,17 @@ class Server
                  * notify the successor, update the successor
                  *  and fix the finger table
                 */
-                std::optional<Message> recv_res;
-                icarus::EventLoop loop;
-                icarus::TcpClient client(&loop, successor_.addr(), "chord client");
-
-                client.set_connection_callback([this] (const icarus::TcpConnectionPtr &conn)
-                {
-                    if (conn->connected())
+                Client client(successor_.addr());
+                auto result = client.send_and_wait_response(Message(
+                    Message::Notify,
                     {
-                        auto send_str = Message(
-                            Message::Notify,
-                            {
-                                std::to_string(this->listen_addr_.to_port())
-                            }
-                        ).to_str();
+                        std::to_string(listen_addr_.to_port())
                     }
-                });
-                client.set_message_callback([this, &recv_res, &loop] (const icarus::TcpConnectionPtr &conn, icarus::Buffer *buf)
-                {
-                    auto res = Message::parse(buf);
-                    if (!res.has_value())
-                    {
-                        return;
-                    }
-                    recv_res = std::move(res);
-                    loop.quit();
-                });
+                ));
 
-                client.connect();
-                loop.loop();
-
-                if (recv_res.has_value())
+                if (result.has_value())
                 {
-                    auto msg = recv_res.value();
+                    auto msg = result.value();
                     auto successor = Node(icarus::InetAddress(
                         msg[0].c_str(),
                         static_cast<std::uint16_t>(std::stoi(msg[1]))
@@ -388,6 +298,9 @@ class Server
                         successor_ = successor;
                     }
                 }
+                /**
+                 * else
+                */
             }
 
             fix_finger_table();
