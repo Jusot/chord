@@ -39,7 +39,14 @@ class Server
     */
     ~Server()
     {
-        // ...
+        if (!established_)
+        {
+            return;
+        }
+
+        /**
+         * TODO:
+        */
     }
 
     void start()
