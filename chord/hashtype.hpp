@@ -20,12 +20,6 @@ class HashType
         // ...
     }
 
-    HashType(const std::string &value)
-      : HashType(std::stoull(value))
-    {
-        // ...
-    }
-
     HashType(const icarus::InetAddress &addr)
       : HashType(std::hash<std::string>{}(addr.to_ip_port()))
     {
@@ -65,6 +59,11 @@ class HashType
     bool operator==(const HashType &rhs) const
     {
         return value_ == rhs.value_;
+    }
+
+    bool operator!=(const HashType &rhs) const
+    {
+        return value_ != rhs.value_;
     }
 
     bool operator<(const HashType &rhs) const
