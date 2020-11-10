@@ -13,7 +13,6 @@
 namespace chord
 {
 class Instruction;
-
 class Server
 {
   public:

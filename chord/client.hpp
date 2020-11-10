@@ -8,7 +8,6 @@ namespace chord
 {
 class Message;
 using TimeoutCallback = std::function<void(bool timeout, const std::optional<Message> &result)>;
-
 /**
  * wrapper of TcpClient
  *  provide the timeout scheme

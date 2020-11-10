@@ -8,7 +8,6 @@
 namespace chord
 {
 class HashType;
-
 class FingerTable
 {
   public:
