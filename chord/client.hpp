@@ -44,7 +44,8 @@ class Client
     */
     void send(const Message &msg)
     {
-        std::thread send_thread([server_addr = server_addr_, msg] {
+        std::thread send_thread([server_addr = server_addr_, msg]
+        {
             icarus::EventLoop loop;
             icarus::TcpClient client(&loop, server_addr, "chord client");
 

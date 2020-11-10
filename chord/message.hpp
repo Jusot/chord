@@ -1,10 +1,13 @@
 #ifndef __CHORD_MESSAGE_HPP__
 #define __CHORD_MESSAGE_HPP__
 
+#include "hashtype.hpp"
+
 #include <string>
 #include <vector>
 #include <optional>
 #include <icarus/buffer.hpp>
+#include <icarus/inetaddress.hpp>
 
 namespace chord
 {
@@ -19,9 +22,12 @@ class Message
     */
     enum Type : char
     {
-        Join, // ,src_port >> ,suc_ip,peer_port
+        Join, // ,src_port >> ,suc_ip,suc_port
         Notify, // ,src_port >> ,pre_ip,pre_port
         FindSuc, // ,hash_value >> ,suc_ip,suc_port
+
+        PreQuit, // ,pre_ip,pre_port
+        SucQuit, // ,suc_ip,suc_port
 
         Get,
         Put,
@@ -61,8 +67,23 @@ class Message
         return message;
     }
 
-    Message(Type type, std::vector<std::string> params)
-      : type_(type), params_(std::move(params))
+    Message(Type type, std::uint16_t port)
+      : type_(type)
+      , params_({std::to_string(port)})
+    {
+        // ...
+    }
+
+    Message(Type type, const icarus::InetAddress &addr)
+      : type_(type)
+      , params_({addr.to_port(), std::to_string(addr.to_port())})
+    {
+        // ...
+    }
+
+    Message(Type type, HashType hash)
+      : type_(type)
+      , params_({hash.to_str()})
     {
         // ...
     }
@@ -77,12 +98,37 @@ class Message
         return result + "\r\n";
     }
 
+    std::uint16_t param_as_port(std::size_t i = 0) const
+    {
+        return static_cast<uint16_t>(std::stoi(params_[i]));
+    }
+
+    icarus::InetAddress param_as_addr(std::size_t start = 0) const
+    {
+        return icarus::InetAddress(
+            params_[start].c_str(),
+            param_as_port(start + 1)
+        );
+    }
+
+    HashType param_as_hash(std::size_t i = 0) const
+    {
+        return HashType(std::stoull(params_[i]));
+    }
+
     Type type() const { return type_; }
     const std::vector<std::string> &params() const { return params_; }
     const std::string &operator[](std::size_t ind_of_param) const
     { return params_[ind_of_param]; }
 
   private:
+    Message(Type type, std::vector<std::string> params)
+      : type_(type)
+      , params_(std::move(params))
+    {
+        // ...
+    }
+
     Type type_;
     std::vector<std::string> params_;
 };
