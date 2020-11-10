@@ -11,8 +11,9 @@ class Node
 {
   public:
     Node() = delete;
-    explicit Node(const icarus::InetAddress &addr);
+    Node(const icarus::InetAddress &addr);
     Node(const Node &other);
+    Node &operator=(const Node &other);
 
     bool between(const HashType &pre, const HashType &suc) const;
     bool between(const Node &pre, const Node &suc) const;
