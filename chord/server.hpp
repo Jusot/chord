@@ -17,9 +17,9 @@ class Server
 {
   public:
     Server(icarus::EventLoop *loop, const icarus::InetAddress &listen_addr);
-    ~Server();
 
     void start();
+    void stop();
     void handle_instruction(const Instruction &ins);
 
   private:

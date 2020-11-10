@@ -25,11 +25,16 @@ Server::Server(icarus::EventLoop *loop, const icarus::InetAddress &listen_addr)
     });
 }
 
+void Server::start()
+{
+    tcp_server_.start();
+}
+
 /**
  * quit: broadcast to set the predecessor's successor
  *  and the successor's predecessor
 */
-Server::~Server()
+void Server::stop()
 {
     if (!established_)
     {
@@ -49,11 +54,6 @@ Server::~Server()
             Message::SucQuit, successor_.addr()
         ));
     }
-}
-
-void Server::start()
-{
-    tcp_server_.start();
 }
 
 void Server::handle_instruction(const Instruction &ins)

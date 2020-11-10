@@ -10,7 +10,7 @@ set (CMAKE_SHARED_LINKER_FLAGS "-rdynamic")
 
 file (GLOB SRC_FILES "chord/*.cpp")
 
-set (CMAKE_CXX_FLAGS "-O3 -Wall")
+set (CMAKE_CXX_FLAGS "-Wall -g")
 
 add_executable (chord ${SRC_FILES})
 
