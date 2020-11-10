@@ -67,12 +67,12 @@ std::string Message::to_str() const
     return result + "\r\n";
 }
 
-std::uint16_t Message::param_as_port(std::size_t i = 0) const
+std::uint16_t Message::param_as_port(std::size_t i) const
 {
     return static_cast<uint16_t>(std::stoi(params_[i]));
 }
 
-icarus::InetAddress Message::param_as_addr(std::size_t start = 0) const
+icarus::InetAddress Message::param_as_addr(std::size_t start) const
 {
     return icarus::InetAddress(
         params_[start].c_str(),
@@ -80,7 +80,7 @@ icarus::InetAddress Message::param_as_addr(std::size_t start = 0) const
     );
 }
 
-HashType Message::param_as_hash(std::size_t i = 0) const
+HashType Message::param_as_hash(std::size_t i) const
 {
     return HashType(std::stoull(params_[i]));
 }

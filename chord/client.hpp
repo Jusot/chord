@@ -5,6 +5,7 @@
 
 #include <chrono>
 #include <optional>
+#include <functional>
 #include <icarus/inetaddress.hpp>
 
 namespace chord

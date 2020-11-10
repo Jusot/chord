@@ -180,7 +180,7 @@ void Server::on_message_join(const icarus::TcpConnectionPtr &conn, const Message
     auto src_ip = conn->peer_address().to_ip();
     auto src_port = msg.param_as_port();
     auto src_addr = icarus::InetAddress(src_ip.c_str(), src_port);
-    conn->send(find_successor(msg.param_as_addr()).to_str());
+    conn->send(find_successor(src_addr).to_str());
 }
 
 void Server::on_message_notify(const icarus::TcpConnectionPtr &conn, const Message &msg)
