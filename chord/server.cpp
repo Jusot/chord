@@ -18,7 +18,11 @@ Server::Server(icarus::EventLoop *loop, const icarus::InetAddress &listen_addr)
   , listen_addr_(listen_addr)
   , tcp_server_(loop, listen_addr, "chord server")
 {
-    // ...
+    tcp_server_.set_thread_num(10);
+    tcp_server_.set_message_callback([this] (const icarus::TcpConnectionPtr &conn, icarus::Buffer *buf)
+    {
+        this->on_message(conn, buf);
+    });
 }
 
 /**
@@ -131,6 +135,11 @@ void Server::handle_instruction_put(const std::string &value)
 
 void Server::on_message(const icarus::TcpConnectionPtr &conn, icarus::Buffer *buf)
 {
+    if (!established_)
+    {
+        return;
+    }
+
     auto res = Message::parse(buf);
     if (!res.has_value())
     {
@@ -199,12 +208,14 @@ void Server::on_message_findsuc(const icarus::TcpConnectionPtr &conn, const Mess
 
 void Server::on_message_prequit(const icarus::TcpConnectionPtr &conn, const Message &msg)
 {
-
+    predecessor_ = msg.param_as_addr();
 }
 
 void Server::on_message_sucquit(const icarus::TcpConnectionPtr &conn, const Message &msg)
 {
-
+    table_.remove(successor_);
+    successor_ = msg.param_as_addr();
+    table_.insert(successor_);
 }
 
 void Server::on_message_get(const icarus::TcpConnectionPtr &conn, const Message &msg)
@@ -255,7 +266,7 @@ void Server::stabilize()
             if (result.has_value())
             {
                 auto msg = result.value();
-                auto successor = Node(msg.param_as_addr());
+                Node successor(msg.param_as_addr());
 
                 if (successor.between(table_.self(), successor_))
                 {
