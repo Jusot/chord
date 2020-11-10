@@ -30,7 +30,7 @@ HashType::HashType(const HashType &other)
  * >.>.>.> this .>.>.>.
  * suc .<.<.<.<.<.< pre
  *
- * in (pre, suc]
+ * in [pre, suc)
 */
 bool HashType::between(HashType pre, HashType suc) const
 {
@@ -40,11 +40,11 @@ bool HashType::between(HashType pre, HashType suc) const
     }
     else if (pre < suc)
     {
-        return pre.value_ < value_ && value_ <= suc.value_;
+        return pre.value_ <= value_ && value_ < suc.value_;
     }
     else
     {
-        return pre.value_ < value_ || value_ <= suc.value_;
+        return pre.value_ <= value_ || value_ < suc.value_;
     }
 }
 
