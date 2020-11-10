@@ -24,8 +24,8 @@ class Server
 
   private:
     void handle_instruction_join(const std::string &value);
-    void handle_instruction_get(const std::string &value);
-    void handle_instruction_put(const std::string &value);
+    void handle_instruction_get (const std::string &value);
+    void handle_instruction_put (const std::string &value);
 
     void on_message(const icarus::TcpConnectionPtr &conn, icarus::Buffer *buf);
     void on_message_join    (const icarus::TcpConnectionPtr &conn, const Message &msg);

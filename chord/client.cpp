@@ -1,5 +1,4 @@
 #include "client.hpp"
-#include "message.hpp"
 
 #include <thread>
 #include <icarus/buffer.hpp>

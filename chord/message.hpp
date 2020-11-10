@@ -42,9 +42,9 @@ class Message
     Message(Type type, const HashType &hash);
 
     std::string to_str() const;
-    std::uint16_t param_as_port(std::size_t i = 0) const;
+    std::uint16_t       param_as_port(std::size_t i = 0) const;
     icarus::InetAddress param_as_addr(std::size_t start = 0) const;
-    HashType param_as_hash(std::size_t i = 0) const;
+    HashType            param_as_hash(std::size_t i = 0) const;
 
     Type type() const;
     const std::vector<std::string> &params() const;

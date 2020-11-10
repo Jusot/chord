@@ -1,12 +1,14 @@
 #ifndef __CHORD_CLIENT_HPP__
 #define __CHORD_CLIENT_HPP__
 
+#include "message.hpp"
+
 #include <chrono>
+#include <optional>
 #include <icarus/inetaddress.hpp>
 
 namespace chord
 {
-class Message;
 using TimeoutCallback = std::function<void(bool timeout, const std::optional<Message> &result)>;
 /**
  * wrapper of TcpClient
