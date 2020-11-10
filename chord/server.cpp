@@ -5,6 +5,7 @@
 #include <thread>
 #include <chrono>
 #include <random>
+#include <fstream>
 #include <iostream>
 #include <icarus/buffer.hpp>
 #include <icarus/tcpclient.hpp>
@@ -109,6 +110,7 @@ void Server::handle_instruction_join(const std::string &value)
 
             Node successor(msg.param_as_addr());
             this->successor_ = successor;
+            this->table_.insert(successor);
 
             std::cout << "[ESTABILISHED SUCCESSFULLY]" << std::endl;
             std::cout << "[SUCCESSOR] Is " << successor.addr().to_ip_port() << std::endl;
@@ -138,12 +140,38 @@ void Server::handle_instruction_join(const std::string &value)
 
 void Server::handle_instruction_get(const std::string &value)
 {
+    auto hash = std::hash<std::string>{}(value);
+    auto server_addr = find_successor(hash).param_as_addr();
+    if (HashType(server_addr) == HashType(listen_addr_))
+    {
+        return;
+    }
 
+    std::cout << "[GET] File whose hash is " << hash << std::endl;
+
+    /**
+     * filename cannot involve ','
+     *  and assume the file exists
+    */
+    std::thread get_thread([server_addr, filename = value]
+    {
+        Client client(server_addr);
+        std::ofstream out(filename);
+        client.send_and_wait_stream(Message(Message::Get, filename), out);
+    });
+    get_thread.detach();
 }
 
 void Server::handle_instruction_put(const std::string &value)
 {
+    auto hash = std::hash<std::string>{}(value);
+    auto peer_addr = find_successor(hash).param_as_addr();
+    if (HashType(peer_addr) != HashType(listen_addr_))
+    {
+        std::cout << "[PUT] File whose hash is " << hash << std::endl;
 
+        Client(peer_addr).send(Message(listen_addr_.to_port(), value).to_str());
+    }
 }
 
 void Server::handle_instruction_quit()
@@ -237,14 +265,16 @@ void Server::on_message_notify(const icarus::TcpConnectionPtr &conn, const Messa
     auto src_addr = icarus::InetAddress(src_ip.c_str(), src_port);
     auto src_node = Node(src_addr);
 
-    if (src_node.between(predecessor_, table_.self()))
+    if (src_node != predecessor_ && src_node.between(predecessor_, table_.self()))
     {
         predecessor_ = src_node;
+
+        std::cout << "[UPDATE PREDECESSOR] To " << predecessor_.addr().to_ip_port() << std::endl;
     }
 
     conn->send(Message(Message::Notify, predecessor_.addr()).to_str());
 
-    std::cout << "[RECEIVE NOTIFY] From " << src_addr.to_ip_port() << std::endl;
+    // std::cout << "[RECEIVE NOTIFY] From " << src_addr.to_ip_port() << std::endl;
 }
 
 void Server::on_message_findsuc(const icarus::TcpConnectionPtr &conn, const Message &msg)
@@ -271,12 +301,32 @@ void Server::on_message_sucquit(const icarus::TcpConnectionPtr &conn, const Mess
 
 void Server::on_message_get(const icarus::TcpConnectionPtr &conn, const Message &msg)
 {
-    // ...
+    /**
+     * assume the file exists
+    */
+    std::string data;
+    std::ifstream file(msg[0]);
+    while (!file.eof())
+    {
+        data.push_back(file.get());
+    }
+    conn->send(data);
+    conn->shutdown();
 }
 
 void Server::on_message_put(const icarus::TcpConnectionPtr &conn, const Message &msg)
 {
-    // ...
+    auto server_ip = conn->peer_address().to_ip();
+    auto server_port = msg.param_as_port();
+    auto server_addr = icarus::InetAddress(server_ip.c_str(), server_port);
+
+    std::thread get_thread([server_addr, filename = msg[1]]
+    {
+        Client client(server_addr);
+        std::ofstream out(filename);
+        client.send_and_wait_stream(Message(Message::Get, filename), out);
+    });
+    get_thread.detach();
 }
 
 /**
@@ -297,14 +347,14 @@ void Server::stabilize()
         if (successor_ == table_.self())
         {
             auto successor = predecessor_;
-            if (successor.between(table_.self(), successor_))
+            if (successor != table_.self())
             {
                 successor_ = successor;
             }
         }
         else
         {
-            std::cout << "[CHECK SUCCESSOR] i.e. " << successor_.addr().to_ip_port() << std::endl;
+            // std::cout << "[CHECK SUCCESSOR] i.e. " << successor_.addr().to_ip_port() << std::endl;
 
             /**
              * notify the successor, update the successor
@@ -321,9 +371,11 @@ void Server::stabilize()
                 auto msg = result.value();
                 Node successor(msg.param_as_addr());
 
-                if (successor.between(table_.self(), successor_))
+                if (successor != table_.self())
                 {
                     successor_ = successor;
+                    table_.insert(successor_);
+
                     std::cout << "[UPDATE SUCCESSOR] To " << successor_.addr().to_ip_port() << std::endl;
                 }
             }
@@ -343,7 +395,8 @@ void Server::fix_finger_table()
     static std::uniform_int_distribution<> dis(1, FingerTable::M - 1);
 
     auto ind = dis(gen);
-    table_[ind] = find_successor(table_.self().hash() + (1 << ind)).param_as_addr();
+    Node node(find_successor(table_.self().hash() + (1ull << ind)).param_as_addr());
+    table_[ind] = node;
 }
 
 Message Server::find_successor(const HashType &hash)
@@ -358,6 +411,16 @@ Message Server::find_successor(const HashType &hash)
     else
     {
         auto ask_node = table_.find(hash);
+        /**
+         * if the hash's successor is not the direct successor
+         *  and cannot find another node which is closed to the hash
+         *  then ask the direct successor
+        */
+        if (ask_node == table_.self())
+        {
+            ask_node = successor_;
+        }
+
         Client client(ask_node.addr());
 
         auto result = client.send_and_wait_response(Message(
