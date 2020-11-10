@@ -77,4 +77,9 @@ const std::vector<Node> &FingerTable::nodes() const
 {
     return nodes_;
 }
+
+Node &FingerTable::operator[](std::size_t ind)
+{
+    return nodes_[ind];
+}
 } // namespace chord

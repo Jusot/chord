@@ -4,6 +4,7 @@
 
 #include <thread>
 #include <chrono>
+#include <random>
 #include <iostream>
 #include <icarus/buffer.hpp>
 #include <icarus/tcpclient.hpp>
@@ -337,7 +338,12 @@ void Server::stabilize()
 
 void Server::fix_finger_table()
 {
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    static std::uniform_int_distribution<> dis(1, FingerTable::M - 1);
 
+    auto ind = dis(gen);
+    table_[ind] = find_successor(table_.self().hash() + (1 << ind)).param_as_addr();
 }
 
 Message Server::find_successor(const HashType &hash)

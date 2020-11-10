@@ -27,6 +27,7 @@ class FingerTable
 
     const Node &self() const;
     const std::vector<Node> &nodes() const;
+    Node &operator[](std::size_t ind);
 
   private:
     Node self_;
