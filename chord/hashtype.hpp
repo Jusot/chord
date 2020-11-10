@@ -16,6 +16,7 @@ class HashType
     HashType(std::size_t value);
     HashType(const icarus::InetAddress &addr);
     HashType(const HashType &other);
+    // `operator=` is implicitly-declared
 
     bool between(HashType pre, HashType suc) const;
 

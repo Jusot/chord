@@ -13,7 +13,7 @@ class Node
     Node() = delete;
     Node(const icarus::InetAddress &addr);
     Node(const Node &other);
-    Node &operator=(const Node &other);
+    // `operator=` is implicitly-declared
 
     bool between(const HashType &pre, const HashType &suc) const;
     bool between(const Node &pre, const Node &suc) const;
