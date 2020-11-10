@@ -45,7 +45,7 @@ Message::Message(Type type, std::uint16_t port)
 
 Message::Message(Type type, const icarus::InetAddress &addr)
   : type_(type)
-  , params_({addr.to_port(), std::to_string(addr.to_port())})
+  , params_({addr.to_ip(), std::to_string(addr.to_port())})
 {
     // ...
 }
