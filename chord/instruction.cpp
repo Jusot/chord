@@ -29,6 +29,14 @@ std::optional<Instruction> Instruction::parse(const std::string &ins)
     {
         type = Quit;
     }
+    else if (type_str == "self-boot")
+    {
+        type = SelfBoot;
+    }
+    else if (type_str == "print")
+    {
+        type = Print;
+    }
     else
     {
         return {};

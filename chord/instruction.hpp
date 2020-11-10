@@ -14,7 +14,10 @@ class Instruction
         Join, // join dst_ip:port
         Get,  // get filename
         Put,  // put filepath
+
         Quit, // quit
+        SelfBoot, // self-boot
+        Print, // print
     };
 
     static std::optional<Instruction>
