@@ -15,6 +15,7 @@ Server::Server(icarus::EventLoop *loop, const icarus::InetAddress &listen_addr)
   , successor_(listen_addr)
   , table_(listen_addr)
   , established_(false)
+  , loop_(loop)
   , listen_addr_(listen_addr)
   , tcp_server_(loop, listen_addr, "chord server")
 {
@@ -40,6 +41,7 @@ void Server::stop()
     {
         return;
     }
+    established_ = false;
 
     if (successor_ != table_.self())
     {
@@ -61,19 +63,28 @@ void Server::handle_instruction(const Instruction &ins)
     switch (ins.type())
     {
     case Instruction::Join:
-      handle_instruction_join(ins.value());
-      break;
+        handle_instruction_join(ins.value());
+        break;
 
     case Instruction::Get:
-      handle_instruction_get(ins.value());
-      break;
+        handle_instruction_get(ins.value());
+        break;
 
     case Instruction::Put:
-      handle_instruction_put(ins.value());
-      break;
+        handle_instruction_put(ins.value());
+        break;
 
-    default:
-      break;
+    case Instruction::Quit:
+        handle_instruction_quit();
+        break;
+
+    case Instruction::SelfBoot:
+        handle_instruction_selfboot();
+        break;
+
+    case Instruction::Print:
+        handle_instruction_print();
+        break;
     }
 }
 
@@ -99,6 +110,7 @@ void Server::handle_instruction_join(const std::string &value)
             this->successor_ = successor;
 
             std::cout << "[ESTABILISHED SUCCESSFULLY]" << std::endl;
+            std::cout << "[SUCCESSOR] Is " << successor.addr().to_ip_port() << std::endl;
             established_ = true;
 
             /**
@@ -117,7 +129,7 @@ void Server::handle_instruction_join(const std::string &value)
         }
     });
 
-    std::cout << "CONNECTING..." << std::endl;
+    std::cout << "[CONNECTING]" << std::endl;
     client.send_and_wait_response(Message(
         Message::Join, listen_addr_.to_port()
     ));
@@ -131,6 +143,38 @@ void Server::handle_instruction_get(const std::string &value)
 void Server::handle_instruction_put(const std::string &value)
 {
 
+}
+
+void Server::handle_instruction_quit()
+{
+    stop();
+    loop_->quit();
+}
+
+void Server::handle_instruction_selfboot()
+{
+    established_ = true;
+    std::thread stabilize_thread([this]
+    {
+        this->stabilize();
+    });
+    stabilize_thread.detach();
+
+    std::cout << "[SELF BOOT]" << std::endl;
+}
+
+void Server::handle_instruction_print()
+{
+    std::cout << "[PRINT] Self is " << listen_addr_.to_ip_port()
+        << "\n[PRINT] Predecessor is " << predecessor_.addr().to_ip_port()
+        << "\n[PRINT] Successor is " << successor_.addr().to_ip_port();
+
+    auto &nodes = table_.nodes();
+    for (std::size_t i = 0; i < nodes.size(); ++i)
+    {
+        std::cout << "\n[PRINT] |" << i << "|" << nodes[i].hash().to_str() << "|" << nodes[i].addr().to_ip_port();
+    }
+    std::cout << std::endl;
 }
 
 void Server::on_message(const icarus::TcpConnectionPtr &conn, icarus::Buffer *buf)
@@ -181,6 +225,8 @@ void Server::on_message_join(const icarus::TcpConnectionPtr &conn, const Message
     auto src_port = msg.param_as_port();
     auto src_addr = icarus::InetAddress(src_ip.c_str(), src_port);
     conn->send(find_successor(src_addr).to_str());
+
+    std::cout << "[RECEIVE JOIN] From " << src_addr.to_ip_port() << std::endl;
 }
 
 void Server::on_message_notify(const icarus::TcpConnectionPtr &conn, const Message &msg)
@@ -196,6 +242,8 @@ void Server::on_message_notify(const icarus::TcpConnectionPtr &conn, const Messa
     }
 
     conn->send(Message(Message::Notify, predecessor_.addr()).to_str());
+
+    std::cout << "[RECEIVE NOTIFY] From " << src_addr.to_ip_port() << std::endl;
 }
 
 void Server::on_message_findsuc(const icarus::TcpConnectionPtr &conn, const Message &msg)
@@ -204,6 +252,8 @@ void Server::on_message_findsuc(const icarus::TcpConnectionPtr &conn, const Mess
      * msg[0] is the hash value
     */
     conn->send(find_successor(msg.param_as_hash()).to_str());
+
+    std::cout << "[RECEIVE FindSuc] Finds " << msg[0] << std::endl;
 }
 
 void Server::on_message_prequit(const icarus::TcpConnectionPtr &conn, const Message &msg)
@@ -253,6 +303,8 @@ void Server::stabilize()
         }
         else
         {
+            std::cout << "[CHECK SUCCESSOR] i.e. " << successor_.addr().to_ip_port() << std::endl;
+
             /**
              * notify the successor, update the successor
              *  and fix the finger table
@@ -271,6 +323,7 @@ void Server::stabilize()
                 if (successor.between(table_.self(), successor_))
                 {
                     successor_ = successor;
+                    std::cout << "[UPDATE SUCCESSOR] To " << successor_.addr().to_ip_port() << std::endl;
                 }
             }
             /**

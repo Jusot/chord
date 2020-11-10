@@ -20,12 +20,16 @@ class Server
 
     void start();
     void stop();
+
     void handle_instruction(const Instruction &ins);
 
   private:
     void handle_instruction_join(const std::string &value);
     void handle_instruction_get (const std::string &value);
     void handle_instruction_put (const std::string &value);
+    void handle_instruction_quit();
+    void handle_instruction_selfboot();
+    void handle_instruction_print();
 
     void on_message(const icarus::TcpConnectionPtr &conn, icarus::Buffer *buf);
     void on_message_join    (const icarus::TcpConnectionPtr &conn, const Message &msg);
@@ -47,6 +51,7 @@ class Server
     FingerTable table_;
 
     bool established_;
+    icarus::EventLoop *loop_;
     icarus::InetAddress listen_addr_;
     icarus::TcpServer tcp_server_;
 };
