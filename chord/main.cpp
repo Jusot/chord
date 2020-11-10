@@ -25,28 +25,29 @@ int main(int argc, char *argv[])
         {
             std::string instruction_str;
             std::getline(std::cin, instruction_str);
+            if (instruction_str.empty())
+            {
+                continue;
+            }
 
             auto res = Instruction::parse(instruction_str);
             if (!res.has_value())
             {
-                std::cout << "<ERROR-INPUT>" << std::endl;
+                std::cout << "<ERROR> Unknown Input" << std::endl;
             }
             else
             {
                 auto instruction = res.value();
                 if (instruction.type() == Instruction::Quit)
                 {
-                    server.stop();
-                    loop.quit();
                     break;
                 }
-                else
-                {
-                    server.handle_instruction(instruction);
-                }
+                server.handle_instruction(instruction);
             }
         }
     });
+
+    std::cout << "[SERVER STARTED] At " << listen_addr.to_ip_port() << std::endl;
 
     server.start();
     loop.loop();
