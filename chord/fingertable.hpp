@@ -23,6 +23,7 @@ class FingerTable
     const Node &find(const Node &node) const;
     const Node &find(const HashType &hash) const;
     void insert(const Node &node);
+    void remove(const Node &node);
 
     const Node &self() const;
     const std::vector<Node> &nodes() const;

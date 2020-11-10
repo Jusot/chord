@@ -54,6 +54,20 @@ void FingerTable::insert(const Node &node)
     }
 }
 
+void FingerTable::remove(const Node &node)
+{
+    /**
+     * simply substitute node by self
+    */
+    for (std::size_t i = 0; i < M; ++i)
+    {
+        if (nodes_[i] == node)
+        {
+            nodes_[i] = self_;
+        }
+    }
+}
+
 const Node &FingerTable::self() const
 {
     return self_;
