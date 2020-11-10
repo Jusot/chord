@@ -39,6 +39,41 @@ class Client
     }
 
     /**
+     * just send msg in a detached thread
+     *  and don't care it is successful or not
+    */
+    void send(const Message &msg)
+    {
+        std::thread send_thread([server_addr = server_addr_, msg] {
+            icarus::EventLoop loop;
+            icarus::TcpClient client(&loop, server_addr, "chord client");
+
+            client.enable_retry();
+            client.set_connection_callback([&msg] (const icarus::TcpConnectionPtr &conn)
+            {
+                if (conn->connected())
+                {
+                    conn->send(msg.to_str());
+                }
+            });
+
+            client.set_write_complete_callback([&loop] (const icarus::TcpConnectionPtr &conn)
+            {
+                conn->shutdown();
+                loop.quit();
+            });
+
+            client.connect();
+            /**
+             * loop may not stop
+             *  but this will be blocked by os
+            */
+            loop.loop();
+        });
+        send_thread.detach();
+    }
+
+    /**
      * if timeout is set
      *  res will be return and passed to the timeout callback
     */
