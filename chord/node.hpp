@@ -45,6 +45,11 @@ class Node
         return hash_ == rhs.hash_;
     }
 
+    bool operator!=(const Node &rhs) const
+    {
+        return hash_ != rhs.hash_;
+    }
+
     bool between(const HashType &pre, const HashType &suc) const
     {
         return hash_.between(pre, suc);

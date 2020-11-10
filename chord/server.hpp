@@ -44,9 +44,19 @@ class Server
             return;
         }
 
-        /**
-         * TODO:
-        */
+        if (successor_ != table_.self())
+        {
+            Client(successor_.addr()).send(Message(
+                Message::PreQuit, predecessor_.addr()
+            ));
+        }
+
+        if (predecessor_ != table_.self())
+        {
+            Client(predecessor_.addr()).send(Message(
+                Message::SucQuit, successor_.addr()
+            ));
+        }
     }
 
     void start()
@@ -93,10 +103,8 @@ class Server
                  * assume the result is correct
                 */
                 auto msg = result.value();
-                Node successor(icarus::InetAddress(
-                    msg[0].c_str(),
-                    static_cast<std::uint16_t>(std::stoi(msg[1]))
-                ));
+
+                Node successor(msg.param_as_addr());
                 this->successor_ = successor;
 
                 std::cout << "[ESTABILISHED SUCCESSFULLY]" << std::endl;
@@ -120,10 +128,7 @@ class Server
 
         std::cout << "CONNECTING..." << std::endl;
         client.send_and_wait_response(Message(
-            Message::Join,
-            {
-                std::to_string(listen_addr_.to_port())
-            }
+            Message::Join, listen_addr_.to_port()
         ));
     }
 
@@ -169,15 +174,15 @@ class Server
     void on_message_join(const icarus::TcpConnectionPtr &conn, const Message &msg)
     {
         auto src_ip = conn->peer_address().to_ip();
-        auto src_port = static_cast<std::uint16_t>(std::stoi(msg[0]));
+        auto src_port = msg.param_as_port();
         auto src_addr = icarus::InetAddress(src_ip.c_str(), src_port);
-        conn->send(find_successor(src_addr).to_str());
+        conn->send(find_successor(msg.param_as_addr()).to_str());
     }
 
     void on_message_notify(const icarus::TcpConnectionPtr &conn, const Message &msg)
     {
         auto src_ip = conn->peer_address().to_ip();
-        auto src_port = static_cast<std::uint16_t>(std::stoi(msg[0]));
+        auto src_port = msg.param_as_port();
         auto src_addr = icarus::InetAddress(src_ip.c_str(), src_port);
         auto src_node = Node(src_addr);
 
@@ -186,14 +191,7 @@ class Server
             predecessor_ = src_node;
         }
 
-        auto send_str = Message(
-            Message::Notify,
-            {
-                predecessor_.addr().to_ip(),
-                std::to_string(predecessor_.addr().to_port())
-            }
-        ).to_str();
-        conn->send(send_str);
+        conn->send(Message(Message::Notify, predecessor_.addr()).to_str());
     }
 
     void on_message_findsuc(const icarus::TcpConnectionPtr &conn, const Message &msg)
@@ -201,7 +199,7 @@ class Server
         /**
          * msg[0] is the hash value
         */
-        conn->send(find_successor(msg[0]).to_str());
+        conn->send(find_successor(msg.param_as_hash()).to_str());
     }
 
     void on_message_get(const icarus::TcpConnectionPtr &conn, const Message &msg)
@@ -221,13 +219,7 @@ class Server
         */
         if (hash.between(table_.self().hash(), successor_.hash()))
         {
-            return Message(
-                Message::FindSuc,
-                {
-                    successor_.addr().to_ip(),
-                    std::to_string(successor_.addr().to_port())
-                }
-            );
+            return Message(Message::FindSuc, successor_.addr());
         }
         else
         {
@@ -235,10 +227,7 @@ class Server
             Client client(ask_node.addr());
 
             auto result = client.send_and_wait_response(Message(
-                Message::FindSuc,
-                {
-                    hash.to_str()
-                }
+                Message::FindSuc, hash
             ));
 
             if (result.has_value())
@@ -287,18 +276,13 @@ class Server
                 Client client(successor_.addr());
                 auto result = client.send_and_wait_response(Message(
                     Message::Notify,
-                    {
-                        std::to_string(listen_addr_.to_port())
-                    }
+                    listen_addr_.to_port()
                 ));
 
                 if (result.has_value())
                 {
                     auto msg = result.value();
-                    auto successor = Node(icarus::InetAddress(
-                        msg[0].c_str(),
-                        static_cast<std::uint16_t>(std::stoi(msg[1]))
-                    ));
+                    auto successor = Node(msg.param_as_addr());
 
                     if (successor.between(table_.self(), successor_))
                     {
