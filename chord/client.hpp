@@ -4,6 +4,7 @@
 #include "message.hpp"
 
 #include <chrono>
+#include <iostream>
 #include <optional>
 #include <functional>
 #include <icarus/inetaddress.hpp>
@@ -32,6 +33,10 @@ class Client
     */
     std::optional<Message>
     send_and_wait_response(const Message &msg);
+    /**
+     * not care about timeout
+    */
+    void send_and_wait_stream(const Message &msg, std::ostream &out);
 
     void set_timeout(std::chrono::seconds time);
     void set_timeout_callback(TimeoutCallback cb);

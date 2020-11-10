@@ -64,11 +64,15 @@ Client::send_and_wait_response(const Message &msg)
     icarus::TcpClient client(&loop, server_addr_, "chord client");
 
     client.enable_retry();
-    client.set_connection_callback([&msg] (const icarus::TcpConnectionPtr &conn)
+    client.set_connection_callback([&msg, &loop] (const icarus::TcpConnectionPtr &conn)
     {
         if (conn->connected())
         {
             conn->send(msg.to_str());
+        }
+        else
+        {
+            loop.quit();
         }
     });
 
@@ -122,6 +126,34 @@ Client::send_and_wait_response(const Message &msg)
     }
 
     return result;
+}
+
+void Client::send_and_wait_stream(const Message &msg, std::ostream &out)
+{
+    icarus::EventLoop loop;
+    icarus::TcpClient client(&loop, server_addr_, "chord client");
+
+    client.enable_retry();
+    client.set_connection_callback([&msg, &loop] (const icarus::TcpConnectionPtr &conn)
+    {
+        if (conn->connected())
+        {
+            conn->send(msg.to_str());
+        }
+        else
+        {
+            loop.quit();
+        }
+    });
+
+    client.set_message_callback([&out, &loop] (const icarus::TcpConnectionPtr &conn, icarus::Buffer *buf)
+    {
+        auto data = buf->retrieve_all_as_string();
+        out.write(data.c_str(), data.size());
+    });
+
+    client.connect();
+    loop.loop();
 }
 
 void Client::set_timeout(std::chrono::seconds time)
