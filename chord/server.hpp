@@ -45,9 +45,12 @@ class Server
 
     Message find_successor(const HashType &hash);
 
+    const Node &self() const;
+    Node &successor();
+    void update_successor(const Node &new_successor);
+
   private:
     Node predecessor_;
-    Node successor_;
     FingerTable table_;
 
     bool established_;
