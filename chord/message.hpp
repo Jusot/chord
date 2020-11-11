@@ -37,11 +37,11 @@ class Message
     static std::optional<Message> parse(icarus::Buffer *buf);
 
   public:
-    Message(Type type, std::uint16_t port);
-    Message(Type type, const icarus::InetAddress &addr);
-    Message(Type type, const HashType &hash);
-    Message(const std::string &filename);
-    Message(std::uint16_t port, const std::string &filename);
+    explicit Message(Type type, std::uint16_t port);
+    explicit Message(Type type, const icarus::InetAddress &addr);
+    explicit Message(Type type, const HashType &hash);
+    explicit Message(const std::string &filename);
+    explicit Message(std::uint16_t port, const std::string &filename);
 
     std::string to_str() const;
     std::uint16_t       param_as_port(std::size_t i = 0) const;
