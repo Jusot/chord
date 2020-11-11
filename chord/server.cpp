@@ -156,7 +156,14 @@ void Server::handle_instruction_get(const std::string &value)
     {
         Client client(server_addr);
         std::ofstream out(filename);
-        client.send_and_wait_stream(Message(filename), out);
+        if (!client.send_and_wait_stream(Message(filename), out))
+        {
+            std::cout << "[FAILED GET] No such file: " << filename << std::endl;
+        }
+        else
+        {
+            std::cout << "[GET SUCCESSFULLY] Download file: " << filename << std::endl;
+        }
     });
     get_thread.detach();
 }
@@ -305,8 +312,15 @@ void Server::on_message_get(const icarus::TcpConnectionPtr &conn, const Message 
     /**
      * assume the file exists
     */
-    std::string data;
     std::ifstream file(msg[0]);
+
+    if (!file.is_open())
+    {
+        conn->force_close();
+        return;
+    }
+
+    std::string data;
     while (!file.eof())
     {
         data.push_back(file.get());
