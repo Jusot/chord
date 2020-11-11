@@ -19,12 +19,13 @@ const Node &FingerTable::find(const Node &node) const
 
 const Node &FingerTable::find(const HashType &hash) const
 {
-    std::size_t ind = 0, dis = -1;
     constexpr std::size_t max = -1;
+
+    std::size_t ind = 0, dis = max;
     for (std::size_t i = 0; i < M; ++i)
     {
         auto now = nodes_[i].hash().value();
-        if (now <= hash.value())
+        if (now < hash.value())
         {
             if (hash.value() - now < dis)
             {
@@ -32,14 +33,19 @@ const Node &FingerTable::find(const HashType &hash) const
                 ind = i;
             }
         }
-        else
+        else if (hash.value() < now)
         {
             if (hash.value() + max - now < dis)
             {
                 dis = hash.value() + max - now;
-                ind = 1;
+                ind = i;
             }
         }
+    }
+
+    if (dis == max)
+    {
+        return self_;
     }
     return nodes_[ind];
 }
@@ -52,8 +58,9 @@ void FingerTable::insert(const Node &node)
     auto base = self_.hash();
     for (std::size_t i = 0; i < M; ++i)
     {
-        auto anchor = base + (1ull << i);
-        if (node.between(anchor, nodes_[i].hash()))
+        auto start = base + (1ull << i);
+        // statr <= node < nodes[i]
+        if (node.hash() == start || node.between(start, nodes_[i].hash()))
         {
             nodes_[i] = node;
         }
