@@ -122,8 +122,10 @@ Client::send_and_wait_response(const Message &msg)
     return result;
 }
 
-void Client::send_and_wait_stream(const Message &msg, std::ostream &out)
+bool Client::send_and_wait_stream(const Message &msg, std::ostream &out)
 {
+    bool receive_stream = false;
+
     icarus::EventLoop loop;
     icarus::TcpClient client(&loop, server_addr_, "chord client");
 
@@ -139,14 +141,18 @@ void Client::send_and_wait_stream(const Message &msg, std::ostream &out)
         }
     });
 
-    client.set_message_callback([&out, &loop] (const icarus::TcpConnectionPtr &conn, icarus::Buffer *buf)
+    client.set_message_callback([&out, &receive_stream, &loop] (const icarus::TcpConnectionPtr &conn, icarus::Buffer *buf)
     {
         out.write(buf->peek(), buf->readable_bytes());
         buf->retrieve_all();
+
+        receive_stream = true;
     });
 
     client.connect();
     loop.loop();
+
+    return receive_stream;
 }
 
 void Client::set_timeout(std::chrono::seconds time)

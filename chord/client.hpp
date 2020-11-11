@@ -36,7 +36,7 @@ class Client
     /**
      * not care about timeout
     */
-    void send_and_wait_stream(const Message &msg, std::ostream &out);
+    bool send_and_wait_stream(const Message &msg, std::ostream &out);
 
     void set_timeout(std::chrono::seconds time);
     void set_timeout_callback(TimeoutCallback cb);
