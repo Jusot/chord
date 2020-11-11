@@ -31,19 +31,16 @@ void Client::send(const Message &msg)
         icarus::EventLoop loop;
         icarus::TcpClient client(&loop, server_addr, "chord client");
 
-        client.enable_retry();
-        client.set_connection_callback([&msg] (const icarus::TcpConnectionPtr &conn)
+        client.set_connection_callback([&msg, &loop] (const icarus::TcpConnectionPtr &conn)
         {
             if (conn->connected())
             {
                 conn->send(msg.to_str());
             }
-        });
-
-        client.set_write_complete_callback([&loop] (const icarus::TcpConnectionPtr &conn)
-        {
-            conn->shutdown();
-            loop.quit();
+            else
+            {
+                loop.quit();
+            }
         });
 
         client.connect();
@@ -63,7 +60,6 @@ Client::send_and_wait_response(const Message &msg)
     icarus::EventLoop loop;
     icarus::TcpClient client(&loop, server_addr_, "chord client");
 
-    client.enable_retry();
     client.set_connection_callback([&msg, &loop] (const icarus::TcpConnectionPtr &conn)
     {
         if (conn->connected())
@@ -86,7 +82,6 @@ Client::send_and_wait_response(const Message &msg)
             }
 
             result = Message::parse(buf);
-            conn->shutdown();
             loop.quit();
         });
 
@@ -104,7 +99,6 @@ Client::send_and_wait_response(const Message &msg)
             }
 
             result = Message::parse(buf);
-            conn->shutdown();
             loop.quit();
             timeout = false;
         });
@@ -133,7 +127,6 @@ void Client::send_and_wait_stream(const Message &msg, std::ostream &out)
     icarus::EventLoop loop;
     icarus::TcpClient client(&loop, server_addr_, "chord client");
 
-    client.enable_retry();
     client.set_connection_callback([&msg, &loop] (const icarus::TcpConnectionPtr &conn)
     {
         if (conn->connected())
@@ -148,8 +141,8 @@ void Client::send_and_wait_stream(const Message &msg, std::ostream &out)
 
     client.set_message_callback([&out, &loop] (const icarus::TcpConnectionPtr &conn, icarus::Buffer *buf)
     {
-        auto data = buf->retrieve_all_as_string();
-        out.write(data.c_str(), data.size());
+        out.write(buf->peek(), buf->readable_bytes());
+        buf->retrieve_all();
     });
 
     client.connect();
