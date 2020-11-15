@@ -7,6 +7,7 @@
 #include <iostream>
 #include <optional>
 #include <functional>
+#include <icarus/eventloop.hpp>
 #include <icarus/inetaddress.hpp>
 
 namespace chord

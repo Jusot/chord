@@ -36,6 +36,7 @@ void Client::send(const Message &msg)
             if (conn->connected())
             {
                 conn->send(msg.to_str());
+                conn->shutdown();
             }
             else
             {
@@ -56,86 +57,92 @@ void Client::send(const Message &msg)
 std::optional<Message>
 Client::send_and_wait_response(const Message &msg)
 {
-    enum State
-    {
-        Connected,
-        DisConnected,
-    };
-
-    State state = DisConnected;
-
     std::optional<Message> result;
-    icarus::EventLoop loop;
-    icarus::TcpClient client(&loop, server_addr_, "chord client");
 
-    client.set_connection_callback([&msg, &state, &loop] (const icarus::TcpConnectionPtr &conn)
+    std::thread send_thread([this, &msg, &result]
     {
-        if (conn->connected())
+        enum State
         {
-            state = Connected;
-            conn->send(msg.to_str());
-        }
-        else
-        {
-            loop.quit();
-        }
-    });
+            Connected,
+            DisConnected,
+        };
 
-    if (keep_wait_)
-    {
-        client.set_message_callback([&result, &loop] (const icarus::TcpConnectionPtr &conn, icarus::Buffer *buf)
+        State state = DisConnected;
+
+        icarus::EventLoop loop;
+        icarus::TcpClient client(&loop, server_addr_, "chord client");
+
+        client.set_connection_callback([&msg, &state, &loop] (const icarus::TcpConnectionPtr &conn)
         {
-            if (buf->findCRLF() == nullptr)
+            if (conn->connected())
             {
-                return;
+                state = Connected;
+                conn->send(msg.to_str());
+                conn->shutdown();
             }
-
-            result = Message::parse(buf);
-            loop.quit();
-        });
-
-        client.connect();
-        loop.loop();
-    }
-    else
-    {
-        client.set_message_callback([&result, &loop] (const icarus::TcpConnectionPtr &conn, icarus::Buffer *buf)
-        {
-            if (buf->findCRLF() == nullptr)
+            else
             {
-                return;
-            }
-
-            result = Message::parse(buf);
-            loop.quit();
-        });
-
-        std::thread timer([&state, &loop, &client, time = timeout_]
-        {
-            auto start = std::chrono::high_resolution_clock::now();
-            while (std::chrono::high_resolution_clock::now() - start < time)
-            {
-                if (state == Connected)
-                {
-                    break;
-                }
-            }
-
-            if (state == DisConnected)
-            {
-                client.stop();
-                /**
-                 * wait client stoped
-                */
-                std::this_thread::sleep_for(std::chrono::seconds(1));
                 loop.quit();
             }
         });
 
-        client.connect();
-        loop.loop();
-        timer.join();
-    }
+        if (keep_wait_)
+        {
+            client.set_message_callback([&result, &loop] (const icarus::TcpConnectionPtr &conn, icarus::Buffer *buf)
+            {
+                if (buf->findCRLF() == nullptr)
+                {
+                    return;
+                }
+
+                result = Message::parse(buf);
+                loop.quit();
+            });
+
+            client.connect();
+            loop.loop();
+        }
+        else
+        {
+            client.set_message_callback([&result, &loop] (const icarus::TcpConnectionPtr &conn, icarus::Buffer *buf)
+            {
+                if (buf->findCRLF() == nullptr)
+                {
+                    return;
+                }
+
+                result = Message::parse(buf);
+                loop.quit();
+            });
+
+            std::thread timer([&state, &loop, &client, time = timeout_]
+            {
+                auto start = std::chrono::high_resolution_clock::now();
+                while (std::chrono::high_resolution_clock::now() - start < time)
+                {
+                    if (state == Connected)
+                    {
+                        break;
+                    }
+                }
+
+                if (state == DisConnected)
+                {
+                    client.stop();
+                    /**
+                     * wait client stoped
+                    */
+                    std::this_thread::sleep_for(std::chrono::seconds(1));
+                    loop.quit();
+                }
+            });
+
+            client.connect();
+            loop.loop();
+            timer.join();
+        }
+    });
+    send_thread.join();
 
     return result;
 }
@@ -144,31 +151,36 @@ bool Client::send_and_wait_stream(const Message &msg, std::ostream &out)
 {
     bool receive_stream = false;
 
-    icarus::EventLoop loop;
-    icarus::TcpClient client(&loop, server_addr_, "chord client");
-
-    client.set_connection_callback([&msg, &loop] (const icarus::TcpConnectionPtr &conn)
+    std::thread send_thread([this, &msg, &out, &receive_stream]
     {
-        if (conn->connected())
+        icarus::EventLoop loop;
+        icarus::TcpClient client(&loop, server_addr_, "chord client");
+
+        client.set_connection_callback([&msg, &loop] (const icarus::TcpConnectionPtr &conn)
         {
-            conn->send(msg.to_str());
-        }
-        else
+            if (conn->connected())
+            {
+                conn->send(msg.to_str());
+                conn->shutdown();
+            }
+            else
+            {
+                loop.quit();
+            }
+        });
+
+        client.set_message_callback([&out, &receive_stream, &loop] (const icarus::TcpConnectionPtr &conn, icarus::Buffer *buf)
         {
-            loop.quit();
-        }
+            out.write(buf->peek(), buf->readable_bytes());
+            buf->retrieve_all();
+
+            receive_stream = true;
+        });
+
+        client.connect();
+        loop.loop();
     });
-
-    client.set_message_callback([&out, &receive_stream, &loop] (const icarus::TcpConnectionPtr &conn, icarus::Buffer *buf)
-    {
-        out.write(buf->peek(), buf->readable_bytes());
-        buf->retrieve_all();
-
-        receive_stream = true;
-    });
-
-    client.connect();
-    loop.loop();
+    send_thread.join();
 
     return receive_stream;
 }
