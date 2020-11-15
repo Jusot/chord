@@ -39,14 +39,12 @@ class Client
     bool send_and_wait_stream(const Message &msg, std::ostream &out);
 
     void set_timeout(std::chrono::seconds time);
-    void set_timeout_callback(TimeoutCallback cb);
     void keep_wait();
 
   private:
     bool keep_wait_;
     std::chrono::seconds timeout_;
     icarus::InetAddress server_addr_;
-    TimeoutCallback timeout_callback_;
 };
 } // namespace chord
 

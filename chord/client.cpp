@@ -56,14 +56,23 @@ void Client::send(const Message &msg)
 std::optional<Message>
 Client::send_and_wait_response(const Message &msg)
 {
+    enum State
+    {
+        Connected,
+        DisConnected,
+    };
+
+    State state = DisConnected;
+
     std::optional<Message> result;
     icarus::EventLoop loop;
     icarus::TcpClient client(&loop, server_addr_, "chord client");
 
-    client.set_connection_callback([&msg, &loop] (const icarus::TcpConnectionPtr &conn)
+    client.set_connection_callback([&msg, &state, &loop] (const icarus::TcpConnectionPtr &conn)
     {
         if (conn->connected())
         {
+            state = Connected;
             conn->send(msg.to_str());
         }
         else
@@ -90,8 +99,7 @@ Client::send_and_wait_response(const Message &msg)
     }
     else
     {
-        bool timeout = true;
-        client.set_message_callback([&result, &loop, &timeout] (const icarus::TcpConnectionPtr &conn, icarus::Buffer *buf)
+        client.set_message_callback([&result, &loop] (const icarus::TcpConnectionPtr &conn, icarus::Buffer *buf)
         {
             if (buf->findCRLF() == nullptr)
             {
@@ -100,23 +108,33 @@ Client::send_and_wait_response(const Message &msg)
 
             result = Message::parse(buf);
             loop.quit();
-            timeout = false;
         });
 
-        std::thread timer([&loop, time = timeout_]
+        std::thread timer([&state, &loop, &client, time = timeout_]
         {
-            /**
-             * TODO: unsafe, may involve more states
-            */
-            std::this_thread::sleep_for(time);
-            loop.quit();
+            auto start = std::chrono::high_resolution_clock::now();
+            while (std::chrono::high_resolution_clock::now() - start < time)
+            {
+                if (state == Connected)
+                {
+                    break;
+                }
+            }
+
+            if (state == DisConnected)
+            {
+                client.stop();
+                /**
+                 * wait client stoped
+                */
+                std::this_thread::sleep_for(std::chrono::seconds(1));
+                loop.quit();
+            }
         });
-        timer.detach();
 
         client.connect();
         loop.loop();
-
-        timeout_callback_(timeout, result);
+        timer.join();
     }
 
     return result;
@@ -159,11 +177,6 @@ void Client::set_timeout(std::chrono::seconds time)
 {
     keep_wait_ = false;
     timeout_ = time;
-}
-
-void Client::set_timeout_callback(TimeoutCallback cb)
-{
-    timeout_callback_ = std::move(cb);
 }
 
 void Client::keep_wait()
