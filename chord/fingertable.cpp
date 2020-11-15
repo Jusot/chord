@@ -2,6 +2,7 @@
 #include "fingertable.hpp"
 
 #include <cassert>
+#include <iostream>
 
 namespace chord
 {
@@ -107,12 +108,22 @@ void FingerTable::insert(Node node)
         if (node.hash() == start || node.between(start, nodes_[i].hash()))
         {
             nodes_[i] = node;
+
+            if (i == 0)
+            {
+                std::cout << "[UPDATE SUCCESSOR] To " << node.addr().to_ip_port() << std::endl;
+            }
         }
     }
 }
 
 void FingerTable::remove(Node node)
 {
+    if (node == self_)
+    {
+        return;
+    }
+
     /**
      * simply substitute node by self
     */
@@ -121,6 +132,11 @@ void FingerTable::remove(Node node)
         if (nodes_[i] == node)
         {
             nodes_[i] = self_;
+
+            if (i == 0)
+            {
+                std::cout << "[UPDATE SUCCESSOR] To " << self_.addr().to_ip_port() << std::endl;
+            }
         }
     }
 }
