@@ -23,7 +23,9 @@ class HashType
     bool operator==(const HashType &rhs) const;
     bool operator!=(const HashType &rhs) const;
     bool operator<(const HashType &rhs) const;
+    bool operator<=(const HashType &rhs) const;
     HashType operator+(const HashType &rhs) const;
+    HashType operator-(const HashType &rhs) const;
 
     std::size_t value() const;
     std::string to_str() const;

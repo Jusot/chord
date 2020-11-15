@@ -67,9 +67,19 @@ bool HashType::operator<(const HashType &rhs) const
     return value_ < rhs.value_;
 }
 
+bool HashType::operator<=(const HashType &rhs) const
+{
+    return value_ <= rhs.value_;
+}
+
 HashType HashType::operator+(const HashType &rhs) const
 {
     return HashType(value_ + rhs.value_);
+}
+
+HashType HashType::operator-(const HashType &rhs) const
+{
+    return HashType(value_ - rhs.value_);
 }
 
 std::size_t HashType::value() const
