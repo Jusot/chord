@@ -61,6 +61,8 @@ void Server::stop()
 
 void Server::handle_instruction(const Instruction &ins)
 {
+    std::lock_guard lock(mutex_);
+
     switch (ins.type())
     {
     case Instruction::Join:
@@ -98,7 +100,7 @@ void Server::handle_instruction_join(const std::string &value)
 
     std::cout << "[CONNECTING]" << std::endl;
 
-    Client client(dst_addr, std::chrono::seconds(3));
+    Client client(dst_addr, std::chrono::seconds(1));
     auto result = client.send_and_wait_response(Message(
         Message::Join, listen_addr_.to_port()
     ));
@@ -114,10 +116,6 @@ void Server::handle_instruction_join(const std::string &value)
         std::cout << "[ESTABILISHED SUCCESSFULLY]" << std::endl;
         std::cout << "[SUCCESSOR] Is " << successor.addr().to_ip_port() << std::endl;
         established_ = true;
-
-        /**
-         * TODO: init finger table from the successor
-        */
 
         std::thread stabilize_thread([this]
         {
@@ -211,8 +209,11 @@ void Server::on_message(const icarus::TcpConnectionPtr &conn, icarus::Buffer *bu
 {
     if (!established_)
     {
+        conn->force_close();
         return;
     }
+
+    std::lock_guard lock(mutex_);
 
     auto res = Message::parse(buf);
     if (!res.has_value())
@@ -226,18 +227,22 @@ void Server::on_message(const icarus::TcpConnectionPtr &conn, icarus::Buffer *bu
     case Message::Join:
         on_message_join(conn, message);
         break;
-    case Message::Notify:
-        on_message_notify(conn, message);
-        break;
     case Message::FindSuc:
         on_message_findsuc(conn, message);
         break;
 
+    case Message::PreNotify:
+        on_message_prenotify(conn, message);
+        break;
+    case Message::SucNotify:
+        on_message_sucnotify(conn, message);
+        break;
+
     case Message::PreQuit:
-        on_message_prequit(conn,message);
+        on_message_prequit(conn, message);
         break;
     case Message::SucQuit:
-        on_message_sucquit(conn,message);
+        on_message_sucquit(conn, message);
         break;
 
     case Message::Get:
@@ -259,7 +264,7 @@ void Server::on_message_join(const icarus::TcpConnectionPtr &conn, const Message
     std::cout << "[RECEIVE JOIN] From " << src_addr.to_ip_port() << std::endl;
 }
 
-void Server::on_message_notify(const icarus::TcpConnectionPtr &conn, const Message &msg)
+void Server::on_message_prenotify(const icarus::TcpConnectionPtr &conn, const Message &msg)
 {
     auto src_ip = conn->peer_address().to_ip();
     auto src_port = msg.param_as_port();
@@ -268,14 +273,20 @@ void Server::on_message_notify(const icarus::TcpConnectionPtr &conn, const Messa
 
     if (src_node.between(predecessor_, self()))
     {
-        predecessor_ = src_node;
-
-        std::cout << "[UPDATE PREDECESSOR] To " << predecessor_.addr().to_ip_port() << std::endl;
+        update_predecessor(src_node);
     }
 
-    conn->send(Message(Message::Notify, predecessor_.addr()).to_str());
+    conn->send(Message(Message::PreNotify, predecessor_.addr()).to_str());
 
     // std::cout << "[RECEIVE NOTIFY] From " << src_addr.to_ip_port() << std::endl;
+}
+
+/**
+ * only keep alive
+*/
+void Server::on_message_sucnotify(const icarus::TcpConnectionPtr &conn, const Message &msg)
+{
+    conn->send(Message(Message::SucNotify, successor().addr()).to_str());
 }
 
 void Server::on_message_findsuc(const icarus::TcpConnectionPtr &conn, const Message &msg)
@@ -291,8 +302,7 @@ void Server::on_message_findsuc(const icarus::TcpConnectionPtr &conn, const Mess
 void Server::on_message_prequit(const icarus::TcpConnectionPtr &conn, const Message &msg)
 {
     table_.remove(predecessor_);
-    predecessor_ = msg.param_as_addr();
-    table_.insert(predecessor_);
+    update_predecessor(msg.param_as_addr());
 }
 
 void Server::on_message_sucquit(const icarus::TcpConnectionPtr &conn, const Message &msg)
@@ -359,14 +369,77 @@ void Server::stabilize()
 {
     while (true)
     {
-        std::this_thread::sleep_for(std::chrono::seconds(1));
+        std::this_thread::sleep_for(std::chrono::seconds(2));
+
+        if (!established_)
+        {
+            continue;
+        }
+
+        {
+            std::lock_guard lock(mutex_);
+            notify_predecessor();
+            notify_successor();
+            fix_finger_table();
+        }
+    }
+}
+
+/**
+ * check predecessor alive or not
+*/
+void Server::notify_predecessor()
+{
+    if (predecessor_ == self())
+    {
+        return;
+    }
+
+    Client client(predecessor_.addr(), std::chrono::seconds(1));
+    auto result = client.send_and_wait_response(Message(
+        Message::SucNotify,
+        listen_addr_.to_port()
+    ));
+
+    if (!result.has_value())
+    {
+        table_.remove(predecessor_);
+        update_predecessor(table_.find_closest_pre(self()));
+    }
+}
+
+void Server::notify_successor()
+{
+    /**
+     * check the predecessor directly if the successor is self
+    */
+    if (successor() == self())
+    {
+        auto new_successor = predecessor_;
+        if (new_successor.between(self(), successor()))
+        {
+            update_successor(new_successor);
+        }
+    }
+    else
+    {
+        // std::cout << "[CHECK SUCCESSOR] i.e. " << successor_.addr().to_ip_port() << std::endl;
 
         /**
-         * check the predecessor directly if the successor is self
+         * notify the successor, update the successor
+         *  and fix the finger table
         */
-        if (successor() == self())
+        Client client(successor().addr(), std::chrono::seconds(1));
+        auto result = client.send_and_wait_response(Message(
+            Message::PreNotify,
+            listen_addr_.to_port()
+        ));
+
+        if (result.has_value())
         {
-            auto new_successor = predecessor_;
+            auto msg = result.value();
+            Node new_successor(msg.param_as_addr());
+
             if (new_successor.between(self(), successor()))
             {
                 update_successor(new_successor);
@@ -374,36 +447,9 @@ void Server::stabilize()
         }
         else
         {
-            // std::cout << "[CHECK SUCCESSOR] i.e. " << successor_.addr().to_ip_port() << std::endl;
-
-            /**
-             * notify the successor, update the successor
-             *  and fix the finger table
-            */
-            Client client(successor().addr(), std::chrono::seconds(3));
-            auto result = client.send_and_wait_response(Message(
-                Message::Notify,
-                listen_addr_.to_port()
-            ));
-
-            if (result.has_value())
-            {
-                auto msg = result.value();
-                Node new_successor(msg.param_as_addr());
-
-                if (new_successor.between(self(), successor()))
-                {
-                    update_successor(new_successor);
-                }
-            }
-            else
-            {
-                table_.remove(successor());
-                update_successor(table_.find_closest_suc(self()));
-            }
+            table_.remove(successor());
+            update_successor(table_.find_closest_suc(self()));
         }
-
-        fix_finger_table();
     }
 }
 
@@ -441,7 +487,7 @@ Message Server::find_successor(const HashType &hash)
             ask_node = successor();
         }
 
-        Client client(ask_node.addr(), std::chrono::seconds(3));
+        Client client(ask_node.addr(), std::chrono::seconds(1));
         auto result = client.send_and_wait_response(Message(
             Message::FindSuc, hash
         ));
@@ -471,9 +517,28 @@ Node &Server::successor()
     return table_[0];
 }
 
+void Server::update_predecessor(const Node &new_predecessor)
+{
+    if (predecessor_ == new_predecessor)
+    {
+        return;
+    }
+
+    std::cout << "[UPDATE PREDECESSOR] To " << new_predecessor.addr().to_ip_port() << std::endl;
+
+    predecessor_ = new_predecessor;
+    table_.insert(new_predecessor);
+}
+
 void Server::update_successor(const Node &new_successor)
 {
+    if (successor() == new_successor)
+    {
+        return;
+    }
+
     std::cout << "[UPDATE SUCCESSOR] To " << new_successor.addr().to_ip_port() << std::endl;
+
     successor() = new_successor;
     table_.insert(new_successor);
 }

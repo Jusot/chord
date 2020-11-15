@@ -5,6 +5,7 @@
 #include "message.hpp"
 #include "fingertable.hpp"
 
+#include <mutex>
 #include <icarus/eventloop.hpp>
 #include <icarus/tcpserver.hpp>
 #include <icarus/inetaddress.hpp>
@@ -32,21 +33,25 @@ class Server
     void handle_instruction_print();
 
     void on_message(const icarus::TcpConnectionPtr &conn, icarus::Buffer *buf);
-    void on_message_join    (const icarus::TcpConnectionPtr &conn, const Message &msg);
-    void on_message_notify  (const icarus::TcpConnectionPtr &conn, const Message &msg);
-    void on_message_findsuc (const icarus::TcpConnectionPtr &conn, const Message &msg);
-    void on_message_prequit (const icarus::TcpConnectionPtr &conn, const Message &msg);
-    void on_message_sucquit (const icarus::TcpConnectionPtr &conn, const Message &msg);
-    void on_message_get     (const icarus::TcpConnectionPtr &conn, const Message &msg);
-    void on_message_put     (const icarus::TcpConnectionPtr &conn, const Message &msg);
+    void on_message_join      (const icarus::TcpConnectionPtr &conn, const Message &msg);
+    void on_message_findsuc   (const icarus::TcpConnectionPtr &conn, const Message &msg);
+    void on_message_prenotify (const icarus::TcpConnectionPtr &conn, const Message &msg);
+    void on_message_sucnotify (const icarus::TcpConnectionPtr &conn, const Message &msg);
+    void on_message_prequit   (const icarus::TcpConnectionPtr &conn, const Message &msg);
+    void on_message_sucquit   (const icarus::TcpConnectionPtr &conn, const Message &msg);
+    void on_message_get       (const icarus::TcpConnectionPtr &conn, const Message &msg);
+    void on_message_put       (const icarus::TcpConnectionPtr &conn, const Message &msg);
 
     void stabilize();
+    void notify_predecessor();
+    void notify_successor();
     void fix_finger_table();
 
     Message find_successor(const HashType &hash);
 
     const Node &self() const;
     Node &successor();
+    void update_predecessor(const Node &new_predecessor);
     void update_successor(const Node &new_successor);
 
   private:
@@ -57,6 +62,8 @@ class Server
     icarus::EventLoop *loop_;
     icarus::InetAddress listen_addr_;
     icarus::TcpServer tcp_server_;
+
+    std::mutex mutex_;
 };
 } // namespace chord
 
