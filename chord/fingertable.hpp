@@ -20,10 +20,16 @@ class FingerTable
     /**
      * return the last node which is less than the given hash
     */
-    const Node &find(const Node &node) const;
-    const Node &find(const HashType &hash) const;
-    void insert(const Node &node);
-    void remove(const Node &node);
+    const Node &find_closest_pre(const Node &node) const;
+    const Node &find_closest_pre(const HashType &hash) const;
+    const Node &find_closest_suc(const Node &node) const;
+    const Node &find_closest_suc(const HashType &hash) const;
+    /**
+     * cannot use const reference to Node
+     *  because it may be the node in this table
+    */
+    void insert(Node node);
+    void remove(Node node);
 
     const Node &self() const;
     const std::vector<Node> &nodes() const;

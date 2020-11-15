@@ -12,32 +12,33 @@ FingerTable::FingerTable(const icarus::InetAddress &addr)
     // ...
 }
 
-const Node &FingerTable::find(const Node &node) const
+const Node &FingerTable::find_closest_pre(const Node &node) const
 {
-    return find(node.hash());
+    return find_closest_pre(node.hash());
 }
 
-const Node &FingerTable::find(const HashType &hash) const
+const Node &FingerTable::find_closest_pre(const HashType &hash) const
 {
     constexpr std::size_t max = -1;
 
-    std::size_t ind = 0, dis = max;
+    std::size_t ind = 0;
+    HashType dis = max;
     for (std::size_t i = 0; i < M; ++i)
     {
-        auto now = nodes_[i].hash().value();
-        if (now < hash.value())
+        auto now = nodes_[i].hash();
+        if (now <= hash)
         {
-            if (hash.value() - now < dis)
+            if (hash - now < dis)
             {
-                dis = hash.value() - now;
+                dis = hash - now;
                 ind = i;
             }
         }
-        else if (hash.value() < now)
+        else if (hash < now)
         {
-            if (hash.value() + max - now < dis)
+            if (hash + max - now < dis)
             {
-                dis = hash.value() + max - now;
+                dis = hash + max - now;
                 ind = i;
             }
         }
@@ -50,7 +51,50 @@ const Node &FingerTable::find(const HashType &hash) const
     return nodes_[ind];
 }
 
-void FingerTable::insert(const Node &node)
+const Node &FingerTable::find_closest_suc(const Node &node) const
+{
+    return find_closest_suc(node.hash());
+}
+
+const Node &FingerTable::find_closest_suc(const HashType &hash) const
+{
+    constexpr std::size_t max = -1;
+
+    std::size_t ind = 0;
+    HashType dis = max;
+    for (std::size_t i = 0; i < M; ++i)
+    {
+        auto now = nodes_[i].hash();
+        /**
+         * different from find_closest_pre
+         *  don't consider the same case
+        */
+        if (hash < now)
+        {
+            if (now - hash < dis)
+            {
+                dis = now - hash;
+                ind = i;
+            }
+        }
+        else if (now < hash)
+        {
+            if (now + max - hash < dis)
+            {
+                dis = now + max - hash;
+                ind = i;
+            }
+        }
+    }
+
+    if (dis == max)
+    {
+        return self_;
+    }
+    return nodes_[ind];
+}
+
+void FingerTable::insert(Node node)
 {
     /**
      * simply traverse each position in current version
@@ -67,7 +111,7 @@ void FingerTable::insert(const Node &node)
     }
 }
 
-void FingerTable::remove(const Node &node)
+void FingerTable::remove(Node node)
 {
     /**
      * simply substitute node by self
