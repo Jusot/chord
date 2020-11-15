@@ -23,8 +23,10 @@ class Message
     enum Type : char
     {
         Join, // ,src_port >> ,suc_ip,suc_port
-        Notify, // ,src_port >> ,pre_ip,pre_port
         FindSuc, // ,hash_value >> ,suc_ip,suc_port
+
+        PreNotify, // ,src_port >> ,pre_ip,pre_port
+        SucNotify, // ,src_port >> ,suc_ip,suc_ip
 
         PreQuit, // ,pre_ip,pre_port
         SucQuit, // ,suc_ip,suc_port
