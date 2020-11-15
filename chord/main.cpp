@@ -38,12 +38,11 @@ int main(int argc, char *argv[])
             else
             {
                 auto instruction = res.value();
+                server.handle_instruction(instruction);
                 if (instruction.type() == Instruction::Quit)
                 {
-                    loop.quit();
                     break;
                 }
-                server.handle_instruction(instruction);
             }
         }
     });
