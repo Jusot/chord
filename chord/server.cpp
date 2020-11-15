@@ -96,45 +96,39 @@ void Server::handle_instruction_join(const std::string &value)
     auto dst_port = static_cast<std::uint16_t>(std::stoi(value.substr(pos + 1)));
     auto dst_addr = icarus::InetAddress(dst_ip.c_str(), dst_port);
 
-    Client client(dst_addr, std::chrono::seconds(3));
-
-    client.set_timeout_callback([this] (bool timeout, const std::optional<Message> &result)
-    {
-        if (!timeout)
-        {
-            /**
-             * assume the result is correct
-            */
-            auto msg = result.value();
-
-            Node successor(msg.param_as_addr());
-            this->successor() = successor;
-            this->table_.insert(successor);
-
-            std::cout << "[ESTABILISHED SUCCESSFULLY]" << std::endl;
-            std::cout << "[SUCCESSOR] Is " << successor.addr().to_ip_port() << std::endl;
-            established_ = true;
-
-            /**
-             * TODO: init finger table from the successor
-            */
-
-            std::thread stabilize_thread([this]
-            {
-                this->stabilize();
-            });
-            stabilize_thread.detach();
-        }
-        else
-        {
-            std::cout << "[FAILED CONNECTION]" << std::endl;
-        }
-    });
-
     std::cout << "[CONNECTING]" << std::endl;
-    client.send_and_wait_response(Message(
+
+    Client client(dst_addr, std::chrono::seconds(3));
+    auto result = client.send_and_wait_response(Message(
         Message::Join, listen_addr_.to_port()
     ));
+
+    if (result.has_value())
+    {
+        auto msg = result.value();
+
+        Node successor(msg.param_as_addr());
+        this->successor() = successor;
+        this->table_.insert(successor);
+
+        std::cout << "[ESTABILISHED SUCCESSFULLY]" << std::endl;
+        std::cout << "[SUCCESSOR] Is " << successor.addr().to_ip_port() << std::endl;
+        established_ = true;
+
+        /**
+         * TODO: init finger table from the successor
+        */
+
+        std::thread stabilize_thread([this]
+        {
+            this->stabilize();
+        });
+        stabilize_thread.detach();
+    }
+    else
+    {
+        std::cout << "[FAILED CONNECTION]" << std::endl;
+    }
 }
 
 void Server::handle_instruction_get(const std::string &value)
@@ -296,7 +290,9 @@ void Server::on_message_findsuc(const icarus::TcpConnectionPtr &conn, const Mess
 
 void Server::on_message_prequit(const icarus::TcpConnectionPtr &conn, const Message &msg)
 {
+    table_.remove(predecessor_);
     predecessor_ = msg.param_as_addr();
+    table_.insert(predecessor_);
 }
 
 void Server::on_message_sucquit(const icarus::TcpConnectionPtr &conn, const Message &msg)
@@ -384,7 +380,7 @@ void Server::stabilize()
              * notify the successor, update the successor
              *  and fix the finger table
             */
-            Client client(successor().addr());
+            Client client(successor().addr(), std::chrono::seconds(3));
             auto result = client.send_and_wait_response(Message(
                 Message::Notify,
                 listen_addr_.to_port()
@@ -400,9 +396,11 @@ void Server::stabilize()
                     update_successor(new_successor);
                 }
             }
-            /**
-             * else
-            */
+            else
+            {
+                table_.remove(successor());
+                update_successor(table_.find_closest_suc(self()));
+            }
         }
 
         fix_finger_table();
@@ -432,7 +430,7 @@ Message Server::find_successor(const HashType &hash)
     }
     else
     {
-        auto ask_node = table_.find(hash);
+        auto ask_node = table_.find_closest_pre(hash);
         /**
          * if the hash's successor is not the direct successor
          *  and cannot find another node which is closed to the hash
@@ -443,8 +441,7 @@ Message Server::find_successor(const HashType &hash)
             ask_node = successor();
         }
 
-        Client client(ask_node.addr());
-
+        Client client(ask_node.addr(), std::chrono::seconds(3));
         auto result = client.send_and_wait_response(Message(
             Message::FindSuc, hash
         ));
@@ -456,9 +453,10 @@ Message Server::find_successor(const HashType &hash)
         else
         {
             /**
-             * what happened
+             * if the node is dead then remove it and refind
             */
-            abort();
+            table_.remove(ask_node);
+            return find_successor(hash);
         }
     }
 }
