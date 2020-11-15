@@ -252,6 +252,8 @@ void Server::on_message(const icarus::TcpConnectionPtr &conn, icarus::Buffer *bu
         on_message_put(conn, message);
         break;
     }
+
+    conn->shutdown();
 }
 
 void Server::on_message_join(const icarus::TcpConnectionPtr &conn, const Message &msg)
@@ -322,7 +324,6 @@ void Server::on_message_get(const icarus::TcpConnectionPtr &conn, const Message 
 
     if (!file.is_open())
     {
-        conn->force_close();
         return;
     }
 
@@ -337,7 +338,6 @@ void Server::on_message_get(const icarus::TcpConnectionPtr &conn, const Message 
     data.pop_back();
 
     conn->send(data);
-    conn->force_close();
 }
 
 void Server::on_message_put(const icarus::TcpConnectionPtr &conn, const Message &msg)
@@ -355,8 +355,6 @@ void Server::on_message_put(const icarus::TcpConnectionPtr &conn, const Message 
         client.send_and_wait_stream(Message(filename), out);
     });
     get_thread.detach();
-
-    conn->force_close();
 }
 
 /**
@@ -420,39 +418,41 @@ void Server::notify_successor()
         {
             update_successor(new_successor);
         }
+        return;
+    }
+
+    // std::cout << "[CHECK SUCCESSOR] i.e. " << successor_.addr().to_ip_port() << std::endl;
+
+    /**
+     * notify the successor, update the successor
+     *  and fix the finger table
+    */
+    Client client(successor().addr(), std::chrono::seconds(1));
+    auto result = client.send_and_wait_response(Message(
+        Message::PreNotify,
+        listen_addr_.to_port()
+    ));
+
+    if (result.has_value())
+    {
+        auto msg = result.value();
+        Node new_successor(msg.param_as_addr());
+
+        if (new_successor.between(self(), successor()))
+        {
+            update_successor(new_successor);
+        }
     }
     else
     {
-        // std::cout << "[CHECK SUCCESSOR] i.e. " << successor_.addr().to_ip_port() << std::endl;
-
-        /**
-         * notify the successor, update the successor
-         *  and fix the finger table
-        */
-        Client client(successor().addr(), std::chrono::seconds(1));
-        auto result = client.send_and_wait_response(Message(
-            Message::PreNotify,
-            listen_addr_.to_port()
-        ));
-
-        if (result.has_value())
-        {
-            auto msg = result.value();
-            Node new_successor(msg.param_as_addr());
-
-            if (new_successor.between(self(), successor()))
-            {
-                update_successor(new_successor);
-            }
-        }
-        else
-        {
-            table_.remove(successor());
-            update_successor(table_.find_closest_suc(self()));
-        }
+        table_.remove(successor());
+        update_successor(table_.find_closest_suc(self()));
     }
 }
 
+/**
+ * FIXME: Unstable now
+*/
 void Server::fix_finger_table()
 {
     static std::random_device rd;
@@ -464,6 +464,9 @@ void Server::fix_finger_table()
     table_[ind] = node;
 }
 
+/**
+ * FIXME: Unstable now
+*/
 Message Server::find_successor(const HashType &hash)
 {
     /**
@@ -476,6 +479,19 @@ Message Server::find_successor(const HashType &hash)
     }
     else
     {
+        // Client client(successor().addr(), std::chrono::seconds(1));
+        // auto result = client.send_and_wait_response(Message(
+        //     Message::FindSuc, hash
+        // ));
+        // if (result.has_value())
+        // {
+        //     return result.value();
+        // }
+        // else
+        // {
+        //     return Message(Message::FindSuc, successor().addr());
+        // }
+
         auto ask_node = table_.find_closest_pre(hash);
         /**
          * if the hash's successor is not the direct successor
