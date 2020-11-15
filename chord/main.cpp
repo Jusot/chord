@@ -40,6 +40,7 @@ int main(int argc, char *argv[])
                 auto instruction = res.value();
                 if (instruction.type() == Instruction::Quit)
                 {
+                    loop.quit();
                     break;
                 }
                 server.handle_instruction(instruction);
@@ -51,6 +52,7 @@ int main(int argc, char *argv[])
 
     server.start();
     loop.loop();
+    input_thread.join();
 
     return 0;
 }
