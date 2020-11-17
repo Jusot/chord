@@ -253,7 +253,11 @@ void Server::on_message(const icarus::TcpConnectionPtr &conn, icarus::Buffer *bu
         break;
     }
 
-    conn->shutdown();
+    /**
+     * force close connection after sending messages
+     *  because shutdown only shutdown writing
+    */
+    conn->force_close();
 }
 
 void Server::on_message_join(const icarus::TcpConnectionPtr &conn, const Message &msg)
