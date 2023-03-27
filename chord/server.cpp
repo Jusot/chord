@@ -2,6 +2,7 @@
 #include "server.hpp"
 #include "instruction.hpp"
 
+#include <ctime>
 #include <thread>
 #include <chrono>
 #include <random>
@@ -148,13 +149,20 @@ void Server::handle_instruction_get(const std::string &value)
     {
         Client client(server_addr);
         std::ofstream out(filename);
+        time_t start = time(nullptr);
         if (!client.send_and_wait_stream(Message(filename), out))
         {
             std::cout << "[FAILED GET] No such file: " << filename << std::endl;
         }
         else
         {
-            std::cout << "[GET SUCCESSFULLY] Download file: " << filename << std::endl;
+            time_t end = time(nullptr);
+            auto file_size = out.tellp();
+            std::cout
+                << "[GET SUCCESSFULLY] Download file: " << filename
+                << " in " << end - start << " seconds"
+                << " with " << file_size << " bytes"
+                << std::endl;
         }
     });
     get_thread.detach();
